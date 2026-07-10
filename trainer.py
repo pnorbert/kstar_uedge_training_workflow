@@ -139,7 +139,7 @@ if (TRAININGSET_DIR / "df.pkl").exists() and (
     print(f"Append new data to training set {TRAININGSET_DIR}")
     df_existing_training: pd.DataFrame = pd.read_pickle(TRAININGSET_DIR / "df.pkl")
     merged_df = pd.concat(
-        [df_existing_training, sampled_df], ignore_index=True
+        [df_existing_training, sampled_df], ignore_index=False
     ).drop_duplicates()
     merged_df.to_pickle(TRAININGSET_DIR / "df.pkl")
 else:
