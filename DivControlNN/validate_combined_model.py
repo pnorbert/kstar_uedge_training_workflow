@@ -85,7 +85,10 @@ if __name__ == '__main__':
     autoencoder = Autoencoder(
         arch_name, input_shp=input_shp, feature_sz=feature_sz, latent_dim=latent_dim, do_vae=vae
     )
-    autoencoder.load_weights(os.path.join(mmae_path, 'weights'))
+    weights_path = os.path.join(mmae_path, 'weights.weights.h5')
+    if not os.path.exists(weights_path):
+        weights_path = os.path.join(mmae_path, 'weights')
+    autoencoder.load_weights(weights_path)
 
     # Preprocess validation data
     ip, ncore, pinj, fz, diff = read_data_inputs(data_path, fname)

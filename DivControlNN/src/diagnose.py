@@ -21,23 +21,40 @@ def plot_ae_training_history(path, model_type):
     with open(history_file, 'r') as fhistory:
         history = fhistory.readlines()
 
-    # Initialize loss history array
-    loss_hist = np.zeros((7 if model_type == 'mmae' else 9,))
-    match_number = re.compile('-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?')
-
-    # Extract loss values from history file
-    for line in history:
-        loss = np.array([float(x) for x in re.findall(match_number, line.strip())])
-        loss_hist = np.vstack((loss_hist, loss))
-
-    # Plot training and validation loss
-    fig = plt.figure()
-    for i, label in enumerate([
+    metric_keys = [
+        'mse_scal', 'mse_prfa', 'mse_prfb',
+        'val_mse_scal', 'val_mse_prfa', 'val_mse_prfb',
+    ] + (['vae', 'val_vae'] if model_type == 'mmvae' else [])
+    labels = [
         'training (Radiation Parameters)', 'training (Outboard Plasma Profiles)',
         'training (Divertor Plasma Profiles)', 'validation (Radiation Parameters)',
         'validation (Outboard Plasma Profiles)', 'validation (Divertor Plasma Profiles)'
-    ] + (['training (N(z))', 'validation (N(z))'] if model_type == 'mmvae' else [])):
-        plt.plot(loss_hist[1:, 0], loss_hist[1:, i + 1], label=label)
+    ] + (['training (N(z))', 'validation (N(z))'] if model_type == 'mmvae' else [])
+    match_metric = re.compile(r"'([^']+)':\s*(?:np\.float32\()?([^\s,)}]+)")
+
+    # Extract keyed loss values from history file. Older failed runs may have
+    # NaN rows in the same directory, so keep only complete finite rows.
+    loss_rows = []
+    for line in history:
+        parts = line.strip().split('\t', 1)
+        if len(parts) != 2:
+            continue
+        metrics = {key: float(value) for key, value in match_metric.findall(parts[1])}
+        if not all(key in metrics for key in metric_keys):
+            continue
+        row = [float(parts[0])] + [metrics[key] for key in metric_keys]
+        if np.isfinite(row).all():
+            loss_rows.append(row)
+
+    if not loss_rows:
+        raise ValueError(f'No finite training history rows found in {history_file}')
+
+    loss_hist = np.array(loss_rows)
+
+    # Plot training and validation loss
+    fig = plt.figure()
+    for i, label in enumerate(labels):
+        plt.plot(loss_hist[:, 0], loss_hist[:, i + 1], label=label)
 
     plt.yscale('log')
     plt.xlabel('Epochs')

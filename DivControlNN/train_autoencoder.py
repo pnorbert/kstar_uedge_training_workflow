@@ -10,9 +10,9 @@ import os
 import sys
 from datetime import datetime
 import numpy as np
-import tensorflow as tf
 from matplotlib import pyplot as plt
 from pathlib import Path
+from DivControlNN.src.keras_compat import tf
 from DivControlNN.src.autoencoder import Autoencoder
 from DivControlNN.src.data import *
 from DivControlNN.src.diagnose import *
@@ -95,8 +95,33 @@ def train_autoencoder(inpath: Path, model_id: str):
     rads[:, 3] *= 2.0
     rads[:, 4] = 10.0 * rads[:, 4] + 0.2
 
+    # Prepare data for the autoencoder
+    print(f'Multi-modal autoencoder is required for this example.')
+    dscalars = rads
+    dprofiles1 = np.stack((teu, neu), axis=-1)
+    dprofiles2 = np.stack((qtl, qtr, jl, jr, tel, ter), axis=-1)
+
+    finite_mask = (
+        np.isfinite(dscalars).all(axis=1)
+        & np.isfinite(dprofiles1).all(axis=(1, 2))
+        & np.isfinite(dprofiles2).all(axis=(1, 2))
+    )
+    if not finite_mask.all():
+        ndropped = int(finite_mask.size - finite_mask.sum())
+        print(f'Dropping {ndropped} samples with non-finite normalized values.')
+        dscalars = dscalars[finite_mask]
+        dprofiles1 = dprofiles1[finite_mask]
+        dprofiles2 = dprofiles2[finite_mask]
+
+    ndata = min(dscalars.shape[0], nsample)
+    if ndata < 3:
+        raise ValueError(f'Need at least 3 finite samples to train the autoencoder, found {ndata}.')
+
+    dscalars = dscalars[:ndata]
+    dprofiles1 = dprofiles1[:ndata]
+    dprofiles2 = dprofiles2[:ndata]
+
     # Split data into training, validation, and testing sets
-    ndata = min(ndata, nsample)
     print(f'Splitting the data ({train_split} for training and validation)')
     tst_ids = np.random.choice(np.arange(ndata), int((1 - train_split) * ndata), replace=False)
     trn_ids = np.setdiff1d(np.arange(ndata), tst_ids)
@@ -105,12 +130,6 @@ def train_autoencoder(inpath: Path, model_id: str):
     np.random.shuffle(trn_ids)
 
     print(f'Training data: {trn_ids.shape}, Validation data: {val_ids.shape}, Testing data: {tst_ids.shape}')
-
-    # Prepare data for the autoencoder
-    print(f'Multi-modal autoencoder is required for this example.')
-    dscalars = rads
-    dprofiles1 = np.stack((teu, neu), axis=-1)
-    dprofiles2 = np.stack((qtl, qtr, jl, jr, tel, ter), axis=-1)
 
     train_data = (dscalars[trn_ids], dprofiles1[trn_ids], dprofiles2[trn_ids])
     val_data = (dscalars[val_ids], dprofiles1[val_ids], dprofiles2[val_ids])
@@ -154,7 +173,7 @@ def train_autoencoder(inpath: Path, model_id: str):
     # Save training results and visualizations
     plot_ae_training_history(outpath, 'mmvae' if vae else 'mmae')
 
-    autoencoder.save_weights(os.path.join(outpath, 'weights'))
+    autoencoder.save_weights(os.path.join(outpath, 'weights.weights.h5'))
 
     # Evaluate the model on the test set
     with tf.device('/cpu:0'):

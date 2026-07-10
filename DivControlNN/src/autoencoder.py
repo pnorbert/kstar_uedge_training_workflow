@@ -3,11 +3,10 @@ import logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from collections import defaultdict
 
-import tensorflow as tf
 import numpy as np
-from tensorflow import keras
 from tensorflow.python.ops.numpy_ops import np_config
 
+from .keras_compat import keras, tf
 from . import architectures
 
 from . import losses
@@ -113,6 +112,10 @@ class Autoencoder(keras.Model):
     def decode(self, z):
         return self.decoder(z).numpy()
 
+    def call(self, x, training=False):
+        z = self.encoder(x, training=training)
+        return self.decoder(z, training=training)
+
     def reconstruct(self, x):
         return self.decoder(self.encoder(x))
 
@@ -158,7 +161,7 @@ class Autoencoder(keras.Model):
             raise ValueError("Unsupported number of components. Customization required.")
 
         if len(xscal.shape) == 2: # for scalars, add addtional dimension
-            xscal = xscal.reshape(xscal.shape+(1,))
+            xscal = tf.expand_dims(xscal, axis=-1)
 
         # Compute losses for scalar inputs
         # loss_mse = tf.keras.losses.MeanSquaredError()(x, y)
@@ -216,6 +219,11 @@ class Autoencoder(keras.Model):
         for i in range(1, ncomps):
             assert ntrain == train_data[i].shape[0]
             assert nvalid == validation_data[i].shape[0]
+
+        self(
+            tuple(tf.convert_to_tensor(component[:1]) for component in train_data),
+            training=False,
+        )
 
         train_data = (tf.data.Dataset.from_tensor_slices(train_data).shuffle(ntrain).batch(batch_size))
         validation_data = (tf.data.Dataset.from_tensor_slices(validation_data).shuffle(nvalid).batch(batch_size))

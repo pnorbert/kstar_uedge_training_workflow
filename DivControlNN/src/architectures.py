@@ -1,5 +1,4 @@
-import tensorflow as tf
-from tensorflow import keras
+from .keras_compat import keras
 from .losses import sampling
 
 # ------------------------------------------------------------------------------ #
@@ -23,6 +22,20 @@ def apply_layers_on(layers, x):
     for layer in layers:
         x = layer(x)
     return x
+
+
+def split_features(feature_sizes, name):
+    return keras.layers.Lambda(
+        lambda x: keras.ops.split(
+            x,
+            [
+                feature_sizes[0],
+                feature_sizes[0] + feature_sizes[1],
+            ],
+            axis=1,
+        ),
+        name=name,
+    )
 
 # ------------------------------------------------------------------------------ #
 # Encoder and Decoder Definitions for `example2_lite`
@@ -182,7 +195,11 @@ def multimodal_dc(input_shp, latent_dim, feat_sz, do_vae=True):
             keras.layers.Dense(2 * latent_dim, activation='relu'),
             keras.layers.Dense(int(1.5 * latent_dim), activation='relu'),
             (keras.layers.Dense(latent_dim, name='z_mu'), keras.layers.Dense(latent_dim, name='z_logvar')),
-            keras.layers.Lambda(sampling, name='z')  # Sampling layer for VAE
+            keras.layers.Lambda(
+                sampling,
+                output_shape=(latent_dim,),
+                name='z',
+            )  # Sampling layer for VAE
         ]
     else:
         encoder_agg = [
@@ -218,7 +235,10 @@ def multimodal_dc(input_shp, latent_dim, feat_sz, do_vae=True):
     # Build the decoder model
     input_z = keras.layers.Input(shape=(latent_dim,), name='input_dec')
     z_mm = apply_layers_on(decoder_agg, input_z)
-    z_scal, z_prf1, z_prf2 = tf.split(z_mm, [feat_sz_scal, feat_sz_prf1, feat_sz_prf2], axis=1)
+    z_scal, z_prf1, z_prf2 = split_features(
+        (feat_sz_scal, feat_sz_prf1, feat_sz_prf2),
+        name='multimodal_feature_split',
+    )(z_mm)
 
     # Reconstruct each modality
     z_scal = apply_layers_on(decoder_scal[1:], z_scal)
