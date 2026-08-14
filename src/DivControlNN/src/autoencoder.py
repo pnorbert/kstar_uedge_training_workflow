@@ -1,15 +1,14 @@
-import os
 import logging
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import os
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 from collections import defaultdict
 
 import numpy as np
 from tensorflow.python.ops.numpy_ops import np_config
 
+from . import architectures, losses
 from .keras_compat import keras, tf
-from . import architectures
-
-from . import losses
 from .losses import sampling
 
 LOGGER = logging.getLogger(__name__)
@@ -18,7 +17,6 @@ LOGGER = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 class Autoencoder(keras.Model):
-
     def __init__(self, arch_name, input_shp, feature_sz, latent_dim, do_vae=False):
         super(Autoencoder, self).__init__()
 
@@ -26,20 +24,20 @@ class Autoencoder(keras.Model):
         self.input_shp = input_shp
         # we will create features for images, profile and signal separately
         # if applicable and then combine them into a latent space
-        self.feat_sz   = feature_sz
+        self.feat_sz = feature_sz
         self.z_dim = latent_dim
         self.is_vae = do_vae
         self.num_components = len(input_shp)
 
-        #LOGGER.info(f'Setting up Autoencoder: (variational={self.is_vae}) '
-        print(f'Setting up Autoencoder: (variational={self.is_vae}) '
-              f'{self.arch_name} : {self.input_shp} --> {self.z_dim}')
+        # LOGGER.info(f'Setting up Autoencoder: (variational={self.is_vae}) '
+        print(
+            f"Setting up Autoencoder: (variational={self.is_vae}) {self.arch_name} : {self.input_shp} --> {self.z_dim}"
+        )
 
         arch = getattr(architectures, self.arch_name)
         self.encoder, self.decoder = arch(self.input_shp, self.z_dim, self.feat_sz, self.is_vae)
 
-
-        '''
+        """
         # ----------------------------------------------------------------------
         # set up the model
         # ----------------------------------------------------------------------
@@ -88,7 +86,7 @@ class Autoencoder(keras.Model):
         #self.decoder = keras.Model(z, y, name="decoder")
         #self.encoder = keras.Model(x, z)
         #self.decoder = keras.Model(z, y)
-        '''
+        """
 
         if True:
             self.encoder.summary(line_length=140)
@@ -98,12 +96,12 @@ class Autoencoder(keras.Model):
         self.optimizer = None
 
         # define weights
-        '''
+        """
         self.custom_weights = np.ones(dims[0], dtype=np.float32)
         self.custom_weights[5:] = 0.02
         LOGGER.info(f'Defined custom weights: {self.custom_weights.shape}; '
                     f'[{self.custom_weights.min()}, {self.custom_weights.max()}]')
-        '''
+        """
 
     # --------------------------------------------------------------------------
     def encode(self, x):
@@ -120,10 +118,10 @@ class Autoencoder(keras.Model):
         return self.decoder(self.encoder(x))
 
     def write_model_summary(self, outpath):
-        with open(os.path.join(outpath, 'model_encoder_summary.txt'), 'w') as f:
-            self.encoder.summary(print_fn=lambda x: f.write(x + '\n'))
-        with open(os.path.join(outpath, 'model_decoder_summary.txt'), 'w') as f:
-            self.decoder.summary(print_fn=lambda x: f.write(x + '\n'))
+        with open(os.path.join(outpath, "model_encoder_summary.txt"), "w") as f:
+            self.encoder.summary(print_fn=lambda x: f.write(x + "\n"))
+        with open(os.path.join(outpath, "model_decoder_summary.txt"), "w") as f:
+            self.decoder.summary(print_fn=lambda x: f.write(x + "\n"))
 
     # --------------------------------------------------------------------------
     # basic train test functions
@@ -139,7 +137,7 @@ class Autoencoder(keras.Model):
             total_loss, loss_metrics = self.compute_losses(data, training=True)
 
         gradients = tape.gradient(total_loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables, strict=False))
         return loss_metrics
 
     @tf.function
@@ -160,34 +158,33 @@ class Autoencoder(keras.Model):
         else:
             raise ValueError("Unsupported number of components. Customization required.")
 
-        if len(xscal.shape) == 2: # for scalars, add addtional dimension
+        if len(xscal.shape) == 2:  # for scalars, add addtional dimension
             xscal = tf.expand_dims(xscal, axis=-1)
 
         # Compute losses for scalar inputs
         # loss_mse = tf.keras.losses.MeanSquaredError()(x, y)
         loss_mse_scal = losses.weighted_loss_mse(xscal, yscal, 2)
-        loss_dict = {'mse_scal': loss_mse_scal}
-        
+        loss_dict = {"mse_scal": loss_mse_scal}
+
         # Compute losses for profile inputs
         loss_mse_prf1 = losses.weighted_loss_mse(xprf1, yprf1, 2)
-        loss_dict['mse_prfa'] = loss_mse_prf1
+        loss_dict["mse_prfa"] = loss_mse_prf1
         loss_mse_prf2 = losses.weighted_loss_mse(xprf2, yprf2, 6)
-        loss_dict['mse_prfb'] = loss_mse_prf2
+        loss_dict["mse_prfb"] = loss_mse_prf2
 
         if not self.is_vae:
             return loss_mse_scal + loss_mse_prf1 + loss_mse_prf2, loss_dict
 
         # Add VAE loss if applicable
-        loss_vae = 1.e-7*losses.vae_loss(z, z)
-        loss_dict['vae'] = loss_vae
+        loss_vae = 1.0e-7 * losses.vae_loss(z, z)
+        loss_dict["vae"] = loss_vae
 
         return loss_mse_scal + loss_mse_prf1 + loss_mse_prf2 + loss_vae, loss_dict
 
     # --------------------------------------------------------------------------
     # the main training loop
     # --------------------------------------------------------------------------
-    def train(self, train_data, validation_data, epochs, batch_size, \
-              learning_rate, outpath):
+    def train(self, train_data, validation_data, epochs, batch_size, learning_rate, outpath):
 
         # todo: this should come from config or function parameters
         # epochs = int(self.config['training']['nepochs'])
@@ -196,7 +193,7 @@ class Autoencoder(keras.Model):
         # batch_size = 100
         # learning_rate = 0.1
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        #self.optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+        # self.optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
 
         # ----------------------------------------------------------------------
         metrics = {}
@@ -208,8 +205,8 @@ class Autoencoder(keras.Model):
         assert len(train_data) == len(validation_data)
 
         # temporary change until we add multiple modalities
-        #train_data = (train_data[0])
-        #validation_data = (validation_data[0])
+        # train_data = (train_data[0])
+        # validation_data = (validation_data[0])
 
         ncomps = len(train_data)
         ntrain = train_data[0].shape[0]
@@ -225,15 +222,14 @@ class Autoencoder(keras.Model):
             training=False,
         )
 
-        train_data = (tf.data.Dataset.from_tensor_slices(train_data).shuffle(ntrain).batch(batch_size))
-        validation_data = (tf.data.Dataset.from_tensor_slices(validation_data).shuffle(nvalid).batch(batch_size))
+        train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(ntrain).batch(batch_size)
+        validation_data = tf.data.Dataset.from_tensor_slices(validation_data).shuffle(nvalid).batch(batch_size)
 
-        fhistory = open(os.path.join(outpath,'history.txt'),'a')
+        fhistory = open(os.path.join(outpath, "history.txt"), "a")
         # ----------------------------------------------------------------------
         # for each epoch
         for epoch in range(1, epochs + 1):
-
-            print (f'> Starting epoch {epoch}...', end='')
+            print(f"> Starting epoch {epoch}...", end="")
 
             metrics = {}
 
@@ -244,32 +240,32 @@ class Autoencoder(keras.Model):
                 for key, val in m1.items():
                     training_metrics_per_batch[key].append(val.numpy())
 
-
             # validation for each batch
             validation_metrics_per_batch = defaultdict(list)
             for x in validation_data:
                 m2 = self.test_step(x)
                 for key, val in m2.items():
-                    validation_metrics_per_batch['val_'+key].append(val.numpy())
+                    validation_metrics_per_batch["val_" + key].append(val.numpy())
 
             # ------------------------------------------------------------------
             # collect the metrics from training and validation
             for key, val in training_metrics_per_batch.items():
-                #metrics[key] = np.sum(val, axis=0)
+                # metrics[key] = np.sum(val, axis=0)
                 metrics[key] = np.mean(val, axis=0)
 
             for key, val in validation_metrics_per_batch.items():
-                #metrics[key] = np.sum(val, axis=0)
+                # metrics[key] = np.sum(val, axis=0)
                 metrics[key] = np.mean(val, axis=0)
 
-            print (f' done!', metrics)
+            print(" done!", metrics)
 
-            fhistory.write(str(epoch)+'\t'+str(metrics)+'\n')
+            fhistory.write(str(epoch) + "\t" + str(metrics) + "\n")
             # ------------------------------------------------------------------
 
         # return all the metrics captured during training
         return metrics
-   
+
         fhistory.close()
+
 
 # ------------------------------------------------------------------------------

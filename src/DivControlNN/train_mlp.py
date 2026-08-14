@@ -6,20 +6,22 @@ last updated by B. Zhu (zhu12@llnl.gov) 03/11/2025
 """
 
 from __future__ import absolute_import, division, print_function
+
+import os
+import pickle
+import sys
+from datetime import datetime
+
+import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
+from numpy import *
 from tensorflow import keras
 from tensorflow.keras.callbacks import ModelCheckpoint
-import matplotlib.pyplot as plt
-import os
-import sys
-import datetime
-import pickle
-from datetime import datetime
-import numpy as np
-from numpy import *
-from src.autoencoder import Autoencoder
-from src.data import *
-from src.diagnose import *
+
+from .src.autoencoder import Autoencoder
+from .src.data import *
+from .src.diagnose import *
 
 ################################################################################
 # Configuration Options
@@ -36,11 +38,11 @@ initial_learning_rate = 1e-2  # Initial learning rate for the optimizer
 nsample = 72000  # Maximum number of samples to use
 
 # Input data paths
-inpath = 'data/'  # Path to raw input data
-fname = 'KSTAR_C_high_Ip.hdf5'  # File name of input data
+inpath = "data/"  # Path to raw input data
+fname = "KSTAR_C_high_Ip.hdf5"  # File name of input data
 
 # Latent space representation (z) input path
-zinpath = './models/vae_multimodal_dc_l16_20250311-222854/'  # Path to pre-trained VAE model
+zinpath = "./models/vae_multimodal_dc_l16_20250311-222854/"  # Path to pre-trained VAE model
 standardize_z = False  # Whether to standardize latent space representations
 
 # Learning rate schedule
@@ -52,56 +54,60 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 # Function Definitions
 ################################################################################
 
+
 def build_mlp_model():
     """
     Builds a Multi-Layer Perceptron (MLP) model for mapping input parameters
     to latent space representations.
     """
-    model = keras.Sequential([
-        keras.layers.Dense(8, activation=tf.nn.relu, input_shape=(train_data.shape[1],), name='input_pars'),
-        keras.layers.Dense(16, activation=tf.nn.relu),
-        keras.layers.BatchNormalization(),
-        keras.layers.Dense(neurons, activation=tf.nn.relu),
-        keras.layers.BatchNormalization(),
-        keras.layers.Dense(neurons, activation=tf.nn.relu),
-        keras.layers.BatchNormalization(),
-        keras.layers.Dense(train_labels.shape[1], activation=None, name='z_mlp_pred')  # Output layer
-    ])
+    model = keras.Sequential(
+        [
+            keras.layers.Dense(8, activation=tf.nn.relu, input_shape=(train_data.shape[1],), name="input_pars"),
+            keras.layers.Dense(16, activation=tf.nn.relu),
+            keras.layers.BatchNormalization(),
+            keras.layers.Dense(neurons, activation=tf.nn.relu),
+            keras.layers.BatchNormalization(),
+            keras.layers.Dense(neurons, activation=tf.nn.relu),
+            keras.layers.BatchNormalization(),
+            keras.layers.Dense(train_labels.shape[1], activation=None, name="z_mlp_pred"),  # Output layer
+        ]
+    )
 
     # Compile the model with Adam optimizer and mean squared error loss
     optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
-    model.compile(loss='mse', optimizer=optimizer)
+    model.compile(loss="mse", optimizer=optimizer)
     return model
+
 
 ################################################################################
 # Main Script
 ################################################################################
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Print TensorFlow version
     print(tf.__version__)
 
     # Generate a unique timestamp for model naming
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_name = f'mlp_dc_n{neurons}_l{layers}_{ts}'
+    model_name = f"mlp_dc_n{neurons}_l{layers}_{ts}"
 
     # Read and preprocess input data
     ip, ncore, pinj, fz, diff = read_data_inputs(inpath, fname)
     ndata = ncore.shape[0]
 
     # Normalize input parameters
-    ip /= 1000.  # Normalize current
-    ncore /= 8.  # Normalize core density
-    pinj /= 10.  # Normalize injected power
-    fz *= 10.  # Normalize impurity fraction
+    ip /= 1000.0  # Normalize current
+    ncore /= 8.0  # Normalize core density
+    pinj /= 10.0  # Normalize injected power
+    fz *= 10.0  # Normalize impurity fraction
     diff /= 2.5  # Normalize diffusivity
 
     # Combine input parameters into a single array
     ips = np.squeeze(np.stack((ip, ncore, pinj, fz, diff), axis=1))
 
     # Load latent space representation (z) data
-    with load(os.path.join(zinpath, 'z.npz')) as data:
-        lsr = data['z']
+    with load(os.path.join(zinpath, "z.npz")) as data:
+        lsr = data["z"]
 
         # Standardize latent space representation if required
         if standardize_z:
@@ -110,7 +116,7 @@ if __name__ == '__main__':
     # Limit the number of samples used
     ndata = min(ndata, nsample)
 
-    print(f'Splitting the data ({train_split} for training)')
+    print(f"Splitting the data ({train_split} for training)")
 
     # Split data into training and testing sets
     trn_ids = np.random.choice(np.arange(ndata), int(train_split * ndata), replace=False)
@@ -126,17 +132,23 @@ if __name__ == '__main__':
     model.summary()
 
     # Early stopping callback to prevent overfitting
-    early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', patience=20)
+    early_stop = keras.callbacks.EarlyStopping(monitor="val_loss", patience=20)
 
     # Set up model saving path
-    outpath = os.path.join('./models', model_name)
+    outpath = os.path.join("./models", model_name)
     os.makedirs(outpath, exist_ok=True)
-    filepath = os.path.join(outpath, 'best_val.hdf5')
+    filepath = os.path.join(outpath, "best_val.hdf5")
 
     # Model checkpoint callback to save the best model
     checkpoint = ModelCheckpoint(
-        filepath, monitor='val_loss', verbose=1, save_best_only=True,
-        save_weights_only=True, mode='auto', save_frequency=1, save_format="tf"
+        filepath,
+        monitor="val_loss",
+        verbose=1,
+        save_best_only=True,
+        save_weights_only=True,
+        mode="auto",
+        save_frequency=1,
+        save_format="tf",
     )
 
     # Start training
@@ -145,12 +157,13 @@ if __name__ == '__main__':
     print("Training starts at ", tstart)
 
     history = model.fit(
-        train_data, train_labels,
+        train_data,
+        train_labels,
         epochs=EPOCHS,
         validation_split=0.2,
         batch_size=batch_size,
         shuffle=True,
-        callbacks=[checkpoint]
+        callbacks=[checkpoint],
     )
 
     # Plot training history
@@ -167,5 +180,5 @@ if __name__ == '__main__':
     test_pred = model.predict(test_data)
 
     # Save validation results
-    np.savez(os.path.join(outpath, 'mlp_validation'), z_true=test_labels, z_pred=test_pred)
+    np.savez(os.path.join(outpath, "mlp_validation"), z_true=test_labels, z_pred=test_pred)
     plot_mlp_validation_statistics(outpath)

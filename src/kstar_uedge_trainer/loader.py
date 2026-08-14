@@ -1,8 +1,8 @@
-from adios2 import FileReader, Stream
-import numpy as np
 import re
-
 from pathlib import Path
+
+import numpy as np
+from adios2 import FileReader, Stream
 
 # Define five control parameters (i.e., inputs)
 #   ip:     plasma current [in kA],
@@ -31,11 +31,8 @@ pattern_campaign = re.compile(r".*Ip(\d+)_p(\d+\.\d+)_d(\d+\.\d+)\.aca")
 pattern_varpath = re.compile(r"n(\d+\.\d+)/f([^\/]*)/images/rads")
 
 
-def read_one_campaign(
-    campaign: Path, ip: int, pinj: float, diff: float, nf_pairs: list[tuple]
-) -> int:
+def read_one_campaign(campaign: Path, ip: int, pinj: float, diff: float, nf_pairs: list[tuple]) -> int:
     case_count = 0
-    result = pattern_campaign.search(str(campaign))
     with FileReader(str(campaign)) as f:
         all_vars = f.available_variables()
         for ncore, fz in nf_pairs:
@@ -62,13 +59,11 @@ def read_one_campaign(
                 jr = f.read(f"{imgpath}/jsatr", defer_read=True)
                 jl = f.read(f"{imgpath}/jsatl", defer_read=True)
             elif f"{imgpath}/jl" in all_vars:
-                print(
-                    f"    WARNING: No jsatl/jsatr, using jr/jl from {campaign} / {imgpath}"
-                )
+                print(f"    WARNING: No jsatl/jsatr, using jr/jl from {campaign} / {imgpath}")
                 jr = f.read(f"{imgpath}/jr", defer_read=True)
                 jl = f.read(f"{imgpath}/jl", defer_read=True)
             else:
-                print(f"    ERROR: Missing ion saturation current info. skip case.")
+                print("    ERROR: Missing ion saturation current info. skip case.")
                 continue
             ### neu = f.read(f"{imgpath}/ni", start=[33, 1, 0], count=[1,-1,1], defer_read=True)
             vni = f.inquire_variable(f"{imgpath}/ni")
@@ -98,9 +93,7 @@ def read_one_campaign(
             jr_list.append(jr[1:-1])
             jl_list.append(jl[1:-1])
             # Heat flux
-            qtr_list.append(
-                qtr_new[1:-1]
-            )  # qtr_new adds radiation and atomic process contribution
+            qtr_list.append(qtr_new[1:-1])  # qtr_new adds radiation and atomic process contribution
             qtl_tmp = qtl_new[:] - 2.0 * (qradhl[:] + qradzl[:])
             qtl_list.append(qtl_tmp[1:-1])
             # Radiation info
@@ -166,7 +159,6 @@ def load_data(output: Path):
         ter = f.read("ter", step_selection=[0, nsteps])
         tel = f.read("tel", step_selection=[0, nsteps])
         jr = f.read("jr", step_selection=[0, nsteps])
-        jl = f.read("jl", step_selection=[0, nsteps])
         qtr = f.read("qtr", step_selection=[0, nsteps])
         qtl = f.read("qtl", step_selection=[0, nsteps])
         rads = f.read("rads", step_selection=[0, nsteps])

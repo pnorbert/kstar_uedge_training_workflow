@@ -2,12 +2,14 @@
 # Utility Functions for Reading Training Data
 # ------------------------------------------------------------------------------
 
-import os
 import glob
-from adios2 import FileReader
-import numpy as np
 import multiprocessing
+import os
+
 import matplotlib.pyplot as plt
+import numpy as np
+from adios2 import FileReader
+
 
 # ------------------------------------------------------------------------------
 def read_data_inputs(filename: str):
@@ -29,9 +31,14 @@ def read_data_inputs(filename: str):
         fz = f.read("fz", step_selection=[0, nsteps])
         diff = f.read("diff", step_selection=[0, nsteps])
 
-    return (ip.astype(np.float32), ncore.astype(np.float32),
-            pinj.astype(np.float32), fz.astype(np.float32),
-            diff.astype(np.float32))
+    return (
+        ip.astype(np.float32),
+        ncore.astype(np.float32),
+        pinj.astype(np.float32),
+        fz.astype(np.float32),
+        diff.astype(np.float32),
+    )
+
 
 # ------------------------------------------------------------------------------
 def read_data_outputs(filename: str):
@@ -63,11 +70,18 @@ def read_data_outputs(filename: str):
     rads[:, 1] = rads[:, 1] / rads[:, 0]  # Divertor radiation fraction
     rads[:, 0] = rads[:, 0] / (pinj * 1e6)  # Total radiation fraction
 
-    return (qtl.astype(np.float32), qtr.astype(np.float32),
-            jl.astype(np.float32), jr.astype(np.float32),
-            tel.astype(np.float32), ter.astype(np.float32),
-            teu.astype(np.float32), neu.astype(np.float32),
-            rads.astype(np.float32))
+    return (
+        qtl.astype(np.float32),
+        qtr.astype(np.float32),
+        jl.astype(np.float32),
+        jr.astype(np.float32),
+        tel.astype(np.float32),
+        ter.astype(np.float32),
+        teu.astype(np.float32),
+        neu.astype(np.float32),
+        rads.astype(np.float32),
+    )
+
 
 # ------------------------------------------------------------------------------
 def lsr_standardize(data):
@@ -82,6 +96,7 @@ def lsr_standardize(data):
     std = np.std(data, axis=-2, keepdims=True)
     return (data - mean) / std, mean, std
 
+
 # ------------------------------------------------------------------------------
 def lsr_destandardize(data, mean, std):
     """
@@ -94,6 +109,7 @@ def lsr_destandardize(data, mean, std):
         De-standardized data.
     """
     return data * std + mean
+
 
 # ------------------------------------------------------------------------------
 def standardize(**kwargs):
@@ -110,12 +126,13 @@ def standardize(**kwargs):
     for k, v in kwargs.items():
         m, s = v.mean(), v.std()
         stds[k] = (m, s)
-        print(f'Standardizing ({k}): {v.shape} : mean = {m}, std = {s}')
+        print(f"Standardizing ({k}): {v.shape} : mean = {m}, std = {s}")
         v -= m
         v /= s
-        print(f'Result: mean = {v.mean()}, std = {v.std()}')
+        print(f"Result: mean = {v.mean()}, std = {v.std()}")
 
     return [(v, stds[k]) for k, v in kwargs.items()]
+
 
 # ------------------------------------------------------------------------------
 def destandardize(**kwargs):
@@ -128,12 +145,13 @@ def destandardize(**kwargs):
     Returns:
         list: De-standardized arrays.
     """
-    for k, (v, stds) in kwargs.items():
+    for _, (v, stds) in kwargs.items():
         m, s = stds
         v *= s
         v += m
 
     return [v for k, (v, stds) in kwargs.items()]
+
 
 # ------------------------------------------------------------------------------
 def maxmin_norm(v, mm=None):
@@ -153,9 +171,10 @@ def maxmin_norm(v, mm=None):
         vmin, vmax = mm
 
     v -= vmin
-    v /= (vmax - vmin)
+    v /= vmax - vmin
 
     return [v, (vmin, vmax)]
+
 
 # ------------------------------------------------------------------------------
 def maxmin_denorm(**kwargs):
@@ -168,10 +187,9 @@ def maxmin_denorm(**kwargs):
     Returns:
         list: De-normalized arrays.
     """
-    for k, (v, mm) in kwargs.items():
+    for _, (v, mm) in kwargs.items():
         vmin, vmax = mm
-        v *= (vmax - vmin)
+        v *= vmax - vmin
         v += vmin
 
     return [v for k, (v, mm) in kwargs.items()]
-

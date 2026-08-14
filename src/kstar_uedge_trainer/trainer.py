@@ -1,28 +1,29 @@
-import pandas as pd
 import sys
-from parameters import (
-    GetParameters,
-    GetDataFrame,
-    select_validation_dir,
-    ask_an_integer,
-)
-from loader import read_one_campaign, combine_data, load_data
-from utils import input_int, input_yes_or_no
 from pathlib import Path
+
+import pandas as pd
+
 from DivControlNN.train_autoencoder import train_autoencoder
+
+from .loader import combine_data, load_data, read_one_campaign
+from .parameters import (
+    GetDataFrame,
+    GetParameters,
+    ask_an_integer,
+    select_testing_dir,
+)
+from .utils import input_int, input_yes_or_no
 
 #
 # MAIN program
 #
 
 ACX = Path("/home/adios/dropbox/adios-campaign-store/kstar.acx").resolve()
-UEDGE_campaign_rootdir = Path(
-    "/home/adios/dropbox/adios-campaign-store/KSTAR24"
-).resolve()
+UEDGE_campaign_rootdir = Path("/home/adios/dropbox/adios-campaign-store/KSTAR24").resolve()
 RANDOM_STATE = 42
-VALIDATION_DIR = Path("validation_set")
+TESTING_DIR = Path("testing_set")
 TRAININGSET_DIR = Path(f"training_set/{RANDOM_STATE}")
-MODEL_DIR = Path(f"model")
+MODEL_DIR = Path("model")
 
 if not ACX.exists():
     print(f"ERROR: Campaign index file {ACX} does not exist")
@@ -33,7 +34,7 @@ if not UEDGE_campaign_rootdir.exists():
     sys.exit(1)
 
 # 1. Check existing training data that is already downloaded
-# 2. Select validation set first, load validation parameters (dataframe)
+# 2. Select testing set first, load testing parameters (dataframe)
 # 3. Get all the available runs (from ACX) -> DataFrame  (parameters.py )
 # in a loop until model is good enough
 #   4. Get N random samples from the Training set
@@ -46,37 +47,30 @@ if not UEDGE_campaign_rootdir.exists():
 #
 # 1. Check on existing training data
 #
-validation_set_dir = None
+testing_set_dir = None
 df_existing_training = pd.DataFrame()
-if (TRAININGSET_DIR / "df.pkl").exists() and (
-    TRAININGSET_DIR / "training_set.bp"
-).exists():
+if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp").exists():
     print(f"Some training set exists in {TRAININGSET_DIR}")
     df_existing_training: pd.DataFrame = pd.read_pickle(TRAININGSET_DIR / "df.pkl")
     print(f"    found {len(df_existing_training)} samples")
-    tsd = TRAININGSET_DIR / "validation_set"
+    tsd = TRAININGSET_DIR / "testing_set"
     if tsd.exists() and (tsd.is_symlink() or tsd.is_dir()):
-        validation_set_dir = tsd
+        testing_set_dir = tsd
 
 #
-# 2. Select validation set first, load validation parameters (dataframe)
+# 2. Select testing set first, load testing parameters (dataframe)
 #
-if validation_set_dir is None:
-    validation_set_dir = select_validation_dir(VALIDATION_DIR)
-    if validation_set_dir is None:
-        print(f"Run make_validation_set.py to create a validation set first")
+if testing_set_dir is None:
+    testing_set_dir = select_testing_dir(TESTING_DIR)
+    if testing_set_dir is None:
+        print("Run make_testing_set.py to create a testing set first")
         sys.exit(1)
 
-    if (
-        not (validation_set_dir / "df.pkl").exists()
-        or not (validation_set_dir / "validation_set.bp").exists()
-    ):
-        print(
-            f"The validation set in {validation_set_dir} is missing/incomplete. Rerun make_validation_set.py"
-        )
+    if not (testing_set_dir / "df.pkl").exists() or not (testing_set_dir / "testing_set.bp").exists():
+        print(f"The testing set in {testing_set_dir} is missing/incomplete. Rerun make_testing_set.py")
         sys.exit(1)
 
-df_validation = pd.read_pickle(validation_set_dir / "df.pkl")
+df_testing = pd.read_pickle(testing_set_dir / "df.pkl")
 
 
 #
@@ -84,13 +78,13 @@ df_validation = pd.read_pickle(validation_set_dir / "df.pkl")
 #
 Ip_list, p_list, d_list, n_list, f_list = GetParameters(str(ACX))
 df = GetDataFrame(Ip_list, p_list, d_list, n_list, f_list)
-df_all_training = df.drop(df_validation.index)
+df_all_training = df.drop(df_testing.index)
 if not df_existing_training.empty:
     df_all_training = df_all_training.drop(df_existing_training.index)
 
 print(
     """
-   Cases = Number of cases to traing on. 
+   Cases = Number of cases to train on.
    ip    = plasma current [in kA],
    n     = ncore: core electron (roughly psin=0.95) density [in m^-3]
    p     = pinj:  total injection power [in MW]
@@ -117,9 +111,7 @@ sampled_df = df_all_training.sample(n_samples, random_state=RANDOM_STATE)
 #
 # 5. Get the archives (aca) and runs that need to be read
 #
-grouped = sampled_df.groupby(["Ip", "p", "d"])[["n", "f"]].apply(
-    lambda g: list(map(tuple, g.to_numpy()))
-)
+grouped = sampled_df.groupby(["Ip", "p", "d"])[["n", "f"]].apply(lambda g: list(map(tuple, g.to_numpy())))
 
 #
 # 6. Read the runs and process the data -> data for training
@@ -133,22 +125,16 @@ for (Ip, p, d), nf_pairs in grouped.items():
 print(f"In total, {cases_count} cases were downloaded.")
 
 
-if (TRAININGSET_DIR / "df.pkl").exists() and (
-    TRAININGSET_DIR / "training_set.bp"
-).exists():
+if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp").exists():
     print(f"Append new data to training set {TRAININGSET_DIR}")
     df_existing_training: pd.DataFrame = pd.read_pickle(TRAININGSET_DIR / "df.pkl")
-    merged_df = pd.concat(
-        [df_existing_training, sampled_df], ignore_index=False
-    ).drop_duplicates()
+    merged_df = pd.concat([df_existing_training, sampled_df], ignore_index=False).drop_duplicates()
     merged_df.to_pickle(TRAININGSET_DIR / "df.pkl")
 else:
     print(f"Save data to training set {TRAININGSET_DIR}")
     TRAININGSET_DIR.mkdir(parents=True, exist_ok=True)
     sampled_df.to_pickle(TRAININGSET_DIR / "df.pkl")
-    (TRAININGSET_DIR / "validation_set").symlink_to(
-        validation_set_dir.resolve(), target_is_directory=True
-    )
+    (TRAININGSET_DIR / "testing_set").symlink_to(testing_set_dir.resolve(), target_is_directory=True)
 
 
 # we could keep data in memory and update the model but instead
@@ -163,13 +149,11 @@ combine_data(output=TRAININGSET_DIR / "training_set.bp", append=True)
 #   7. Train model
 #
 
-ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = load_data(
-    TRAININGSET_DIR / "training_set.bp"
-)
+ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = load_data(TRAININGSET_DIR / "training_set.bp")
 
 n = len(df_existing_training) + n_samples
 train_autoencoder(TRAININGSET_DIR, f"{RANDOM_STATE}_{n}")
 
 
-#   8. Validate model
+#   8. Evaluate model with testing set
 #   9. Select new N random samples

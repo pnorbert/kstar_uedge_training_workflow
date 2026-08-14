@@ -15,9 +15,7 @@ def input_yes_or_no(msg: str, default_answer: bool = False) -> bool:
 
 def input_int(prompt: str, min_val: int, max_val: int, default: int) -> int:
     while True:
-        user_input = input(
-            f"{prompt} [{min_val}-{max_val}] (default={default}): "
-        ).strip()
+        user_input = input(f"{prompt} [{min_val}-{max_val}] (default={default}): ").strip()
 
         # If user just hits Enter → return default
         if user_input == "":

@@ -9,20 +9,22 @@ rewritten to read from downloaded .bp adios2 files
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
+
 import numpy as np
 from matplotlib import pyplot as plt
-from pathlib import Path
-from DivControlNN.src.keras_compat import tf
+
 from DivControlNN.src.autoencoder import Autoencoder
 from DivControlNN.src.data import *
 from DivControlNN.src.diagnose import *
+from DivControlNN.src.keras_compat import tf
 
 # Suppress TensorFlow warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # Enable eager execution for TensorFlow
 tf.config.run_functions_eagerly(True)
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
 
 # ------------------------------------------------------------------------------
 # Configuration: Input/Output Dimensions, Training Parameters, and Paths
@@ -33,7 +35,7 @@ input_sz = [(24,), (24,), (24,), (24,), (24,), (24,), (24,), (24,), (5,)]
 latent_dim = 16  # Latent space dimensionality
 
 # Model architecture and training parameters
-arch_name = 'multimodal_dc'
+arch_name = "multimodal_dc"
 nepochs = 10
 train_split = 0.9
 valid_split = 0.2
@@ -51,10 +53,11 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 # Main Function
 # ------------------------------------------------------------------------------
 
+
 def train_autoencoder(inpath: Path, model_id: str):
 
     # Define model name based on whether VAE is used
-    model_name = f'vae_{arch_name}_l{latent_dim}_{model_id}' if vae else f'ae_{arch_name}_l{latent_dim}_{model_id}'
+    model_name = f"vae_{arch_name}_l{latent_dim}_{model_id}" if vae else f"ae_{arch_name}_l{latent_dim}_{model_id}"
 
     # Read and preprocess data
     qtl, qtr, jl, jr, tel, ter, teu, neu, rads = read_data_outputs(str(inpath / "training_set.bp"))
@@ -96,7 +99,7 @@ def train_autoencoder(inpath: Path, model_id: str):
     rads[:, 4] = 10.0 * rads[:, 4] + 0.2
 
     # Prepare data for the autoencoder
-    print(f'Multi-modal autoencoder is required for this example.')
+    print("Multi-modal autoencoder is required for this example.")
     dscalars = rads
     dprofiles1 = np.stack((teu, neu), axis=-1)
     dprofiles2 = np.stack((qtl, qtr, jl, jr, tel, ter), axis=-1)
@@ -108,35 +111,35 @@ def train_autoencoder(inpath: Path, model_id: str):
     )
     if not finite_mask.all():
         ndropped = int(finite_mask.size - finite_mask.sum())
-        print(f'Dropping {ndropped} samples with non-finite normalized values.')
+        print(f"Dropping {ndropped} samples with non-finite normalized values.")
         dscalars = dscalars[finite_mask]
         dprofiles1 = dprofiles1[finite_mask]
         dprofiles2 = dprofiles2[finite_mask]
 
     ndata = min(dscalars.shape[0], nsample)
     if ndata < 3:
-        raise ValueError(f'Need at least 3 finite samples to train the autoencoder, found {ndata}.')
+        raise ValueError(f"Need at least 3 finite samples to train the autoencoder, found {ndata}.")
 
     dscalars = dscalars[:ndata]
     dprofiles1 = dprofiles1[:ndata]
     dprofiles2 = dprofiles2[:ndata]
 
     # Split data into training, validation, and testing sets
-    print(f'Splitting the data ({train_split} for training and validation)')
+    print(f"Splitting the data ({train_split} for training and validation)")
     tst_ids = np.random.choice(np.arange(ndata), int((1 - train_split) * ndata), replace=False)
     trn_ids = np.setdiff1d(np.arange(ndata), tst_ids)
     val_ids = np.random.choice(trn_ids, int(valid_split * len(trn_ids)), replace=False)
     trn_ids = np.setdiff1d(trn_ids, val_ids)
     np.random.shuffle(trn_ids)
 
-    print(f'Training data: {trn_ids.shape}, Validation data: {val_ids.shape}, Testing data: {tst_ids.shape}')
+    print(f"Training data: {trn_ids.shape}, Validation data: {val_ids.shape}, Testing data: {tst_ids.shape}")
 
     train_data = (dscalars[trn_ids], dprofiles1[trn_ids], dprofiles2[trn_ids])
     val_data = (dscalars[val_ids], dprofiles1[val_ids], dprofiles2[val_ids])
     test_data = (dscalars[tst_ids], dprofiles1[tst_ids], dprofiles2[tst_ids])
     full_data = (dscalars, dprofiles1, dprofiles2)
 
-    print(f'Combined data: scalars = {dscalars.shape}, profiles1 = {dprofiles1.shape}, profiles2 = {dprofiles2.shape}')
+    print(f"Combined data: scalars = {dscalars.shape}, profiles1 = {dprofiles1.shape}, profiles2 = {dprofiles2.shape}")
 
     # Define input and feature sizes
     scal_sz = input_sz[8] + (1,)
@@ -146,16 +149,10 @@ def train_autoencoder(inpath: Path, model_id: str):
     feature_sz = (5, 8, 16)
 
     # Initialize the autoencoder
-    autoencoder = Autoencoder(
-        arch_name,
-        input_shp=input_shp,
-        feature_sz=feature_sz,
-        latent_dim=latent_dim,
-        do_vae=vae
-    )
+    autoencoder = Autoencoder(arch_name, input_shp=input_shp, feature_sz=feature_sz, latent_dim=latent_dim, do_vae=vae)
 
     # Create output directory
-    outpath = os.path.join('./models', model_name)
+    outpath = os.path.join("./models", model_name)
     os.makedirs(outpath, exist_ok=True)
     autoencoder.write_model_summary(outpath)
 
@@ -171,12 +168,12 @@ def train_autoencoder(inpath: Path, model_id: str):
     print("Training completes at ", tend)
 
     # Save training results and visualizations
-    plot_ae_training_history(outpath, 'mmvae' if vae else 'mmae')
+    plot_ae_training_history(outpath, "mmvae" if vae else "mmae")
 
-    autoencoder.save_weights(os.path.join(outpath, 'weights.weights.h5'))
+    autoencoder.save_weights(os.path.join(outpath, "weights.weights.h5"))
 
     # Evaluate the model on the test set
-    with tf.device('/cpu:0'):
+    with tf.device("/cpu:0"):
         z = autoencoder.encoder(test_data)
         pred_data = autoencoder.decoder(z)
         test_scal = test_data[0]
@@ -188,13 +185,13 @@ def train_autoencoder(inpath: Path, model_id: str):
 
         # Save validation results
         np.savez(
-            os.path.join(outpath, 'validation'),
+            os.path.join(outpath, "validation"),
             test_scal=test_scal,
             test_prf1=test_prf1,
             test_prf2=test_prf2,
             pred_scal=pred_scal,
             pred_prf1=pred_prf1,
-            pred_prf2=pred_prf2
+            pred_prf2=pred_prf2,
         )
 
         plot_ae_validation_example(outpath, 0)
@@ -203,5 +200,5 @@ def train_autoencoder(inpath: Path, model_id: str):
     # Save latent space representation
     z = autoencoder.encoder(full_data)
     _, z_mean, z_std = lsr_standardize(z)  # Ignoring the first output as it's not needed (for now)
-    np.savez(os.path.join(outpath, 'z'), z=z, z_mean=z_mean, z_std=z_std)
+    np.savez(os.path.join(outpath, "z"), z=z, z_mean=z_mean, z_std=z_std)
     plot_lsr_distribution(outpath)

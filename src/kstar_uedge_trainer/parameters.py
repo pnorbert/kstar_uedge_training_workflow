@@ -1,7 +1,8 @@
-import sqlite3
-import pandas as pd
 import re
+import sqlite3
 from pathlib import Path
+
+import pandas as pd
 
 # ACX = "/home/adios/dropbox/adios-campaign-store/kstar.acx"
 
@@ -40,7 +41,9 @@ def GetParameters(
 
     nrows, mrows = 0, 0
     res = cur.execute(
-        "SELECT a.name, d.name FROM archives as a JOIN datasets as d ON d.archiveid = a.rowid WHERE d.name LIKE '%/images';"
+        "SELECT a.name, d.name FROM archives as a "
+        "JOIN datasets as d ON d.archiveid = a.rowid "
+        "WHERE d.name LIKE '%/images';"
     )
     for row in res:
         nrows += 1
@@ -67,14 +70,12 @@ def GetParameters(
     return Ip_list, p_list, d_list, n_list, f_list
 
 
-def GetDataFrame(
-    Ips: list[int], ps: list[float], ds: list[float], ns: list[float], fs: list[float]
-) -> pd.DataFrame:
+def GetDataFrame(Ips: list[int], ps: list[float], ds: list[float], ns: list[float], fs: list[float]) -> pd.DataFrame:
     df = pd.DataFrame({"Ip": Ips, "p": ps, "d": ds, "n": ns, "f": fs})
     return df
 
 
-def select_validation_dir(base: Path):
+def select_testing_dir(base: Path):
     if not base.exists() or not base.is_dir():
         print(f"Directory '{base}' does not exist.")
         return None
@@ -92,14 +93,14 @@ def select_validation_dir(base: Path):
                 continue
 
     if not options:
-        print("No valid directories found.")
+        print("No valid testing directories found.")
         return None
 
     # Sort for nicer display
     options.sort()
 
     # Show choices
-    print("Available validation sets:")
+    print("Available testing sets:")
     for i, (M, r, _) in enumerate(options):
         print(f"{i}: M={M}, r={r}")
 

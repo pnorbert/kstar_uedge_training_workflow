@@ -1,0 +1,122 @@
+[build-system]
+requires = [
+    "setuptools>=77",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kstar-uedge-trainer"
+version = "0.1.0"
+description = "Remote trainer on KSTAR UEDGE simulation datasets for DivControlNN"
+readme = "README.md"
+authors = [
+    { name = "Norbert Podhorszki", email = "pnorbert@ornl.gov" },
+]
+license = "Apache-2.0"
+license-files = ["LICENSE", "src/DivControlNN/LICENSE"]
+keywords = [
+    "campaign",
+    "remote data",
+    "adios2",
+    "kstar",
+    "uedge",
+    "training",
+    "surrogate",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "adios2>=2.12.0.1001",
+    "hpc-campaign>=0.7",
+    "keras",
+    "matplotlib",
+    "numpy",
+    "pandas>=2.3.3",
+    "scipy",
+    "tensorflow",
+]
+
+[project.optional-dependencies]
+cuda = [
+    "tensorflow[and-cuda]; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[project.urls]
+Source = "https://github.com/pnorbert/kstar_uedge_training_workflow.git"
+Tracker = "https://github.com/pnorbert/kstar_uedge_training_workflow.git/issues"
+
+[project.scripts]
+kstar-uedge-trainer = "kstar_uedge_trainer.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["DivControlNN*", "kstar_uedge_trainer*"]
+
+[tool.pyright]
+include = ["src/kstar_uedge_trainer"]
+exclude = ["**/__pycache__"]
+reportPossiblyUnboundVariable = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [
+    "docs/",
+    "build/",
+    "dist/",
+    "dockerfiles/",
+    "*.egg-info/",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["E712", "E203", "E302", "F401", "F403", "F405"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pylint>=4.0.4,<5.0.0",
+    "pytest>=9.0.1,<10.0.0",
+    "ruff>=0.15.6",
+]
+
+[[tool.mypy.overrides]]
+module = "h5py"
+ignore_missing_imports = true
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.messages_control]
+# A comma-separated list of message symbols or IDs to disable.
+disable = [
+    "invalid-name",
+    "missing-module-docstring",
+    "missing-function-docstring",
+    "too-many-branches",
+    "duplicate-code",
+]
+
+[tool.pylint.main]
+# Specify a score threshold to be exceeded before program exits with error.
+fail-under = 10.0
+# Add files or directories to ignore
+ignore = ".git"
+
+[tool.pytest.ini_options]
+log_file = "pytest.log"
+log_file_level = "DEBUG"
+testpaths = ["tests"]
