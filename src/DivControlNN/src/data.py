@@ -8,7 +8,22 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from adios2 import FileReader
+from adios2 import Stream
+
+
+def _read_all_steps(filename: str, variable_names: tuple[str, ...]) -> tuple[np.ndarray, ...]:
+    """Read variable-sized ADIOS2 steps and concatenate their sample rows."""
+    values_by_name = {name: [] for name in variable_names}
+
+    with Stream(filename, "r") as stream:
+        for _ in stream.steps():
+            for name in variable_names:
+                values_by_name[name].append(np.array(stream.read(name), copy=True))
+
+    if not values_by_name[variable_names[0]]:
+        raise ValueError(f"No steps found in ADIOS2 file {filename}")
+
+    return tuple(np.concatenate(values_by_name[name], axis=0) for name in variable_names)
 
 
 # ------------------------------------------------------------------------------
@@ -22,14 +37,7 @@ def read_data_inputs(filename: str):
     Returns:
         tuple: Arrays for ip, ncore, pinj, fz, and diff.
     """
-    with FileReader(filename) as f:
-        vip = f.inquire_variable("ip")
-        nsteps = vip.steps()
-        ip = f.read("ip", step_selection=[0, nsteps])
-        ncore = f.read("ncore", step_selection=[0, nsteps])
-        pinj = f.read("pinj", step_selection=[0, nsteps])
-        fz = f.read("fz", step_selection=[0, nsteps])
-        diff = f.read("diff", step_selection=[0, nsteps])
+    ip, ncore, pinj, fz, diff = _read_all_steps(filename, ("ip", "ncore", "pinj", "fz", "diff"))
 
     return (
         ip.astype(np.float32),
@@ -43,7 +51,7 @@ def read_data_inputs(filename: str):
 # ------------------------------------------------------------------------------
 def read_data_outputs(filename: str):
     """
-    Reads a lightweight version of example dataset 2 from an HDF5 file.
+    Reads model outputs from an ADIOS2 file.
 
     Args
         filename (str): Path of the ADIOS2 file.
@@ -52,19 +60,10 @@ def read_data_outputs(filename: str):
         tuple: Arrays for qtl, qtr, jl, jr, tel, ter, teu, neu, and rads.
     """
 
-    with FileReader(filename) as f:
-        vip = f.inquire_variable("ip")
-        nsteps = vip.steps()
-        neu = f.read("neu", step_selection=[0, nsteps])
-        teu = f.read("teu", step_selection=[0, nsteps])
-        ter = f.read("ter", step_selection=[0, nsteps])
-        tel = f.read("tel", step_selection=[0, nsteps])
-        jr = f.read("jr", step_selection=[0, nsteps])
-        jl = f.read("jl", step_selection=[0, nsteps])
-        qtr = f.read("qtr", step_selection=[0, nsteps])
-        qtl = f.read("qtl", step_selection=[0, nsteps])
-        rads = f.read("rads", step_selection=[0, nsteps])
-        pinj = f.read("pinj", step_selection=[0, nsteps])
+    neu, teu, ter, tel, jr, jl, qtr, qtl, rads, pinj = _read_all_steps(
+        filename,
+        ("neu", "teu", "ter", "tel", "jr", "jl", "qtr", "qtl", "rads", "pinj"),
+    )
 
     # Normalize radiation data
     rads[:, 1] = rads[:, 1] / rads[:, 0]  # Divertor radiation fraction

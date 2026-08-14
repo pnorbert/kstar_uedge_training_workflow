@@ -154,21 +154,19 @@ def combine_data(output: Path | None = None, append: bool = True):
 
 
 def load_data(output: Path):
-    with FileReader(str(output)) as f:
-        vip = f.inquire_variable("ip")
-        nsteps = vip.steps()
-        ip = f.read("ip", step_selection=[0, nsteps])
-        ncore = f.read("ncore", step_selection=[0, nsteps])
-        pinj = f.read("pinj", step_selection=[0, nsteps])
-        fz = f.read("fz", step_selection=[0, nsteps])
-        diff = f.read("diff", step_selection=[0, nsteps])
-        neu = f.read("neu", step_selection=[0, nsteps])
-        teu = f.read("teu", step_selection=[0, nsteps])
-        ter = f.read("ter", step_selection=[0, nsteps])
-        tel = f.read("tel", step_selection=[0, nsteps])
-        jr = f.read("jr", step_selection=[0, nsteps])
-        qtr = f.read("qtr", step_selection=[0, nsteps])
-        qtl = f.read("qtl", step_selection=[0, nsteps])
-        rads = f.read("rads", step_selection=[0, nsteps])
+    variable_names = ("ip", "ncore", "pinj", "fz", "diff", "neu", "teu", "ter", "tel", "jr", "qtr", "qtl", "rads")
+    values_by_name = {name: [] for name in variable_names}
+
+    with Stream(str(output), "r") as stream:
+        for _ in stream.steps():
+            for name in variable_names:
+                values_by_name[name].append(np.array(stream.read(name), copy=True))
+
+    if not values_by_name["ip"]:
+        raise ValueError(f"No steps found in ADIOS2 file {output}")
+
+    ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = (
+        np.concatenate(values_by_name[name], axis=0) for name in variable_names
+    )
 
     return ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads
