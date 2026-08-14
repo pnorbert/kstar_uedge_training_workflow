@@ -1,161 +1,130 @@
 #!/usr/bin/env python3
 """
-Script for training an MLP for latent space mapping.
+Train an MLP that maps UEDGE input parameters into the autoencoder latent space.
 
-last updated by B. Zhu (zhu12@llnl.gov) 03/11/2025
+Original by B. Zhu (zhu12@llnl.gov), last updated 03/11/2025.
+Rewritten to read from downloaded ADIOS2 data and to be called as a function.
 """
 
-from __future__ import absolute_import, division, print_function
-
-import os
-import pickle
-import sys
 from datetime import datetime
+from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
-from numpy import *
-from tensorflow import keras
-from tensorflow.keras.callbacks import ModelCheckpoint
 
-from .src.autoencoder import Autoencoder
-from .src.data import *
-from .src.diagnose import *
-
-################################################################################
-# Configuration Options
-################################################################################
+from DivControlNN.src.data import lsr_standardize, read_data_inputs
+from DivControlNN.src.diagnose import plot_mlp_training_history, plot_mlp_validation_statistics
+from DivControlNN.src.keras_compat import keras, tf
 
 # Training parameters
-EPOCHS = 10  # Number of epochs for training
-neurons = 32  # Number of neurons in hidden layers
-layers = 4  # Number of layers in the MLP
-dropout_rate = 0.2  # Dropout rate for regularization
-train_split = 0.9  # Fraction of data used for training
-batch_size = 256  # Batch size for training
-initial_learning_rate = 1e-2  # Initial learning rate for the optimizer
-nsample = 72000  # Maximum number of samples to use
-
-# Input data paths
-inpath = "data/"  # Path to raw input data
-fname = "KSTAR_C_high_Ip.hdf5"  # File name of input data
-
-# Latent space representation (z) input path
-zinpath = "./models/vae_multimodal_dc_l16_20250311-222854/"  # Path to pre-trained VAE model
-standardize_z = False  # Whether to standardize latent space representations
+EPOCHS = 10
+neurons = 32
+layers = 4
+dropout_rate = 0.2
+train_split = 0.9
+batch_size = 256
+initial_learning_rate = 1e-2
+nsample = 72000
+standardize_z = False
 
 # Learning rate schedule
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate, decay_steps=50000, decay_rate=0.95, staircase=True
 )
 
-################################################################################
-# Function Definitions
-################################################################################
 
-
-def build_mlp_model():
-    """
-    Builds a Multi-Layer Perceptron (MLP) model for mapping input parameters
-    to latent space representations.
-    """
+def build_mlp_model(input_dim: int, output_dim: int):
+    """Build the MLP that maps normalized control parameters to latent variables."""
     model = keras.Sequential(
         [
-            keras.layers.Dense(8, activation=tf.nn.relu, input_shape=(train_data.shape[1],), name="input_pars"),
+            keras.Input(shape=(input_dim,)),
+            keras.layers.Dense(8, activation=tf.nn.relu, name="input_pars"),
             keras.layers.Dense(16, activation=tf.nn.relu),
             keras.layers.BatchNormalization(),
             keras.layers.Dense(neurons, activation=tf.nn.relu),
             keras.layers.BatchNormalization(),
             keras.layers.Dense(neurons, activation=tf.nn.relu),
             keras.layers.BatchNormalization(),
-            keras.layers.Dense(train_labels.shape[1], activation=None, name="z_mlp_pred"),  # Output layer
+            keras.layers.Dense(output_dim, activation=None, name="z_mlp_pred"),
         ]
     )
 
-    # Compile the model with Adam optimizer and mean squared error loss
     optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
     model.compile(loss="mse", optimizer=optimizer)
     return model
 
 
-################################################################################
-# Main Script
-################################################################################
+def train_mlp(inpath: Path, autoencoder_path: Path, model_id: str) -> Path:
+    """Train an MLP from the downloaded inputs and an autoencoder's latent space."""
+    print("TensorFlow version:", tf.__version__)
 
-if __name__ == "__main__":
-    # Print TensorFlow version
-    print(tf.__version__)
+    model_name = f"mlp_dc_n{neurons}_l{layers}_{model_id}"
+    training_set = inpath / "training_set.bp"
 
-    # Generate a unique timestamp for model naming
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_name = f"mlp_dc_n{neurons}_l{layers}_{ts}"
+    ip, ncore, pinj, fz, diff = read_data_inputs(str(training_set))
 
-    # Read and preprocess input data
-    ip, ncore, pinj, fz, diff = read_data_inputs(inpath, fname)
-    ndata = ncore.shape[0]
+    # Normalize input parameters using the original DivControlNN scaling.
+    ip /= 1000.0
+    ncore /= 8.0
+    pinj /= 10.0
+    fz *= 10.0
+    diff /= 2.5
+    inputs = np.squeeze(np.stack((ip, ncore, pinj, fz, diff), axis=1))
 
-    # Normalize input parameters
-    ip /= 1000.0  # Normalize current
-    ncore /= 8.0  # Normalize core density
-    pinj /= 10.0  # Normalize injected power
-    fz *= 10.0  # Normalize impurity fraction
-    diff /= 2.5  # Normalize diffusivity
+    latent_space_file = autoencoder_path / "z.npz"
+    with np.load(latent_space_file) as data:
+        latent_space = data["z"]
+        if "sample_ids" in data:
+            sample_ids = data["sample_ids"]
+        elif latent_space.shape[0] == inputs.shape[0]:
+            sample_ids = np.arange(inputs.shape[0])
+        else:
+            raise ValueError(
+                f"Cannot align {inputs.shape[0]} MLP inputs with {latent_space.shape[0]} latent-space rows; "
+                f"{latent_space_file} does not contain sample_ids."
+            )
 
-    # Combine input parameters into a single array
-    ips = np.squeeze(np.stack((ip, ncore, pinj, fz, diff), axis=1))
-
-    # Load latent space representation (z) data
-    with load(os.path.join(zinpath, "z.npz")) as data:
-        lsr = data["z"]
-
-        # Standardize latent space representation if required
         if standardize_z:
-            lsr, lsr_mean, lsr_std = lsr_standardize(lsr)
+            latent_space, _, _ = lsr_standardize(latent_space)
 
-    # Limit the number of samples used
-    ndata = min(ndata, nsample)
+    if sample_ids.ndim != 1 or sample_ids.shape[0] != latent_space.shape[0]:
+        raise ValueError("Latent-space sample_ids must contain one input row index per latent-space row.")
+    if sample_ids.size and (sample_ids.min() < 0 or sample_ids.max() >= inputs.shape[0]):
+        raise ValueError("Latent-space sample_ids reference rows outside the MLP input data.")
+
+    inputs = inputs[sample_ids]
+    ndata = min(inputs.shape[0], latent_space.shape[0], nsample)
+    if ndata < 2:
+        raise ValueError(f"Need at least 2 aligned samples to train the MLP, found {ndata}.")
+    inputs = inputs[:ndata]
+    latent_space = latent_space[:ndata]
 
     print(f"Splitting the data ({train_split} for training)")
+    train_ids = np.random.choice(np.arange(ndata), int(train_split * ndata), replace=False)
+    test_ids = np.setdiff1d(np.arange(ndata), train_ids)
 
-    # Split data into training and testing sets
-    trn_ids = np.random.choice(np.arange(ndata), int(train_split * ndata), replace=False)
-    tst_ids = np.setdiff1d(np.arange(ndata), trn_ids)
+    train_data = inputs[train_ids]
+    train_labels = latent_space[train_ids]
+    test_data = inputs[test_ids]
+    test_labels = latent_space[test_ids]
 
-    train_data = ips[trn_ids, :]
-    train_labels = lsr[trn_ids, :]
-    test_data = ips[tst_ids, :]
-    test_labels = lsr[tst_ids, :]
-
-    # Build and summarize the MLP model
-    model = build_mlp_model()
+    model = build_mlp_model(train_data.shape[1], train_labels.shape[1])
     model.summary()
 
-    # Early stopping callback to prevent overfitting
-    early_stop = keras.callbacks.EarlyStopping(monitor="val_loss", patience=20)
-
-    # Set up model saving path
-    outpath = os.path.join("./models", model_name)
-    os.makedirs(outpath, exist_ok=True)
-    filepath = os.path.join(outpath, "best_val.hdf5")
-
-    # Model checkpoint callback to save the best model
-    checkpoint = ModelCheckpoint(
-        filepath,
+    outpath = Path("models") / model_name
+    outpath.mkdir(parents=True, exist_ok=True)
+    checkpoint_file = outpath / "best_val.weights.h5"
+    checkpoint = keras.callbacks.ModelCheckpoint(
+        checkpoint_file,
         monitor="val_loss",
         verbose=1,
         save_best_only=True,
         save_weights_only=True,
         mode="auto",
-        save_frequency=1,
-        save_format="tf",
+        save_freq="epoch",
     )
 
-    # Start training
-    now = datetime.now()
-    tstart = now.strftime("%H:%M:%S")
-    print("Training starts at ", tstart)
-
+    tstart = datetime.now().strftime("%H:%M:%S")
+    print("MLP training starts at ", tstart)
     history = model.fit(
         train_data,
         train_labels,
@@ -165,20 +134,13 @@ if __name__ == "__main__":
         shuffle=True,
         callbacks=[checkpoint],
     )
-
-    # Plot training history
     plot_mlp_training_history(outpath, history)
+    print("MLP training completes at ", datetime.now().strftime("%H:%M:%S"))
 
-    now = datetime.now()
-    tend = now.strftime("%H:%M:%S")
-    print("Training completes at ", tend)
-
-    # Load the best model for evaluation
-    model.load_weights(filepath)
-
-    # Predict latent space representations for the test set
+    model.load_weights(checkpoint_file)
     test_pred = model.predict(test_data)
 
-    # Save validation results
-    np.savez(os.path.join(outpath, "mlp_validation"), z_true=test_labels, z_pred=test_pred)
+    np.savez(outpath / "mlp_validation", z_true=test_labels, z_pred=test_pred)
     plot_mlp_validation_statistics(outpath)
+
+    return outpath

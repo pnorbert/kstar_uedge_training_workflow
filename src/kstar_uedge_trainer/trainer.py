@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from DivControlNN.train_autoencoder import train_autoencoder
+from DivControlNN.train_mlp import train_mlp
 
 from .loader import combine_data, load_data, read_one_campaign
 from .parameters import (
@@ -153,7 +154,9 @@ combine_data(output=TRAININGSET_DIR / "training_set.bp", append=True)
 ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = load_data(TRAININGSET_DIR / "training_set.bp")
 
 n = len(df_existing_training) + n_samples
-train_autoencoder(TRAININGSET_DIR, f"{RANDOM_STATE}_{n}")
+model_id = f"{RANDOM_STATE}_{n}"
+autoencoder_path = train_autoencoder(TRAININGSET_DIR, model_id)
+train_mlp(TRAININGSET_DIR, autoencoder_path, model_id)
 
 
 #   8. Evaluate model with testing set

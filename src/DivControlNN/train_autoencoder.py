@@ -54,7 +54,7 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 # ------------------------------------------------------------------------------
 
 
-def train_autoencoder(inpath: Path, model_id: str):
+def train_autoencoder(inpath: Path, model_id: str) -> Path:
 
     # Define model name based on whether VAE is used
     model_name = f"vae_{arch_name}_l{latent_dim}_{model_id}" if vae else f"ae_{arch_name}_l{latent_dim}_{model_id}"
@@ -109,6 +109,7 @@ def train_autoencoder(inpath: Path, model_id: str):
         & np.isfinite(dprofiles1).all(axis=(1, 2))
         & np.isfinite(dprofiles2).all(axis=(1, 2))
     )
+    sample_ids = np.flatnonzero(finite_mask)
     if not finite_mask.all():
         ndropped = int(finite_mask.size - finite_mask.sum())
         print(f"Dropping {ndropped} samples with non-finite normalized values.")
@@ -123,6 +124,7 @@ def train_autoencoder(inpath: Path, model_id: str):
     dscalars = dscalars[:ndata]
     dprofiles1 = dprofiles1[:ndata]
     dprofiles2 = dprofiles2[:ndata]
+    sample_ids = sample_ids[:ndata]
 
     # Split data into training, validation, and testing sets
     print(f"Splitting the data ({train_split} for training and validation)")
@@ -200,5 +202,7 @@ def train_autoencoder(inpath: Path, model_id: str):
     # Save latent space representation
     z = autoencoder.encoder(full_data)
     _, z_mean, z_std = lsr_standardize(z)  # Ignoring the first output as it's not needed (for now)
-    np.savez(os.path.join(outpath, "z"), z=z, z_mean=z_mean, z_std=z_std)
+    np.savez(os.path.join(outpath, "z"), z=z, z_mean=z_mean, z_std=z_std, sample_ids=sample_ids)
     plot_lsr_distribution(outpath)
+
+    return Path(outpath)
