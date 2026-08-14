@@ -4,11 +4,12 @@ from shutil import rmtree
 
 from .loader import combine_data, read_one_campaign
 from .parameters import GetDataFrame, GetParameters
-from .utils import input_int, input_yes_or_no
+from .utils import input_int, input_yes_or_no, read_config
 
-ACX = Path("/home/adios/dropbox/adios-campaign-store/kstar.acx").resolve()
-UEDGE_campaign_rootdir = Path("/home/adios/dropbox/adios-campaign-store/KSTAR24").resolve()
-RANDOM_STATE = 42
+CONFIG = read_config()
+ACX = CONFIG.acx
+UEDGE_campaign_rootdir = CONFIG.uedge_campaign_rootdir
+RANDOM_STATE = CONFIG.random_state
 TESTING_DIR = Path("testing_set")
 
 

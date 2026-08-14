@@ -12,15 +12,16 @@ from .parameters import (
     ask_an_integer,
     select_testing_dir,
 )
-from .utils import input_int, input_yes_or_no
+from .utils import input_int, input_yes_or_no, read_config
 
 #
 # MAIN program
 #
 
-ACX = Path("/home/adios/dropbox/adios-campaign-store/kstar.acx").resolve()
-UEDGE_campaign_rootdir = Path("/home/adios/dropbox/adios-campaign-store/KSTAR24").resolve()
-RANDOM_STATE = 42
+CONFIG = read_config()
+ACX = CONFIG.acx
+UEDGE_campaign_rootdir = CONFIG.uedge_campaign_rootdir
+RANDOM_STATE = CONFIG.random_state
 TESTING_DIR = Path("testing_set")
 TRAININGSET_DIR = Path(f"training_set/{RANDOM_STATE}")
 MODEL_DIR = Path("model")
@@ -63,11 +64,11 @@ if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp
 if testing_set_dir is None:
     testing_set_dir = select_testing_dir(TESTING_DIR)
     if testing_set_dir is None:
-        print("Run make_testing_set.py to create a testing set first")
+        print("Run kstar_uedge_create_testing_set to create a testing set first")
         sys.exit(1)
 
     if not (testing_set_dir / "df.pkl").exists() or not (testing_set_dir / "testing_set.bp").exists():
-        print(f"The testing set in {testing_set_dir} is missing/incomplete. Rerun make_testing_set.py")
+        print(f"The testing set in {testing_set_dir} is missing/incomplete. Rerun kstar_uedge_create_testing_set")
         sys.exit(1)
 
 df_testing = pd.read_pickle(testing_set_dir / "df.pkl")

@@ -45,6 +45,7 @@ dependencies = [
     "matplotlib",
     "numpy",
     "pandas>=2.3.3",
+    "PyYAML>=6",
     "scipy",
     "tensorflow",
 ]
@@ -59,8 +60,8 @@ Source = "https://github.com/pnorbert/kstar_uedge_training_workflow.git"
 Tracker = "https://github.com/pnorbert/kstar_uedge_training_workflow.git/issues"
 
 [project.scripts]
-kstar-uedge-trainer = "kstar_uedge_trainer.__main__:main"
-kstar_uedge_create_testing_set = "kstar_uedge_trainer.make_testing_set:main"
+kstar_uedge_trainer = "kstar_uedge_trainer.__main__:main"
+kstar_uedge_create_testing_set = "kstar_uedge_trainer.create_testing_set:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

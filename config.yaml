@@ -1,0 +1,4 @@
+# ACX and UEDGE_campaign_rootdir must be absolute paths.
+ACX: /home/adios/dropbox/adios-campaign-store/kstar.acx
+UEDGE_campaign_rootdir: /home/adios/dropbox/adios-campaign-store/KSTAR24
+RANDOM_STATE: 42
