@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 import numpy as np
-from adios2 import FileReader, Stream
+from adios2 import Adios, FileReader, Stream
 
 # Define five control parameters (i.e., inputs)
 #   ip:     plasma current [in kA],
@@ -32,11 +32,19 @@ pattern_varpath = re.compile(r"n(\d+\.\d+)/f([^\/]*)/images/rads")
 
 
 def read_one_campaign(campaign: Path, ip: int, pinj: float, diff: float, nf_pairs: list[tuple]) -> int:
+    if not nf_pairs:
+        return 0
+
     case_count = 0
-    with FileReader(str(campaign)) as f:
+    image_paths = [f"n{ncore}/f{fz}/images" for ncore, fz in nf_pairs]
+
+    adios = Adios()
+    io = adios.declare_io("campaign-reader")
+    io.set_parameter("include-dataset", ";".join(re.escape(path) for path in image_paths))
+
+    with FileReader(io, str(campaign)) as f:
         all_vars = f.available_variables()
-        for ncore, fz in nf_pairs:
-            imgpath = f"n{ncore}/f{fz}/images"
+        for (ncore, fz), imgpath in zip(nf_pairs, image_paths, strict=True):
             # print(f"  {imgpath}")
 
             # Check for required dataset
