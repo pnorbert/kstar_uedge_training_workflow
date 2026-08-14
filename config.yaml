@@ -1,4 +1,12 @@
+# ACX is the path to the KSTAR campaign index created from all campaign files
+#     see "hpc_campaign index -h"
+# UEDGE_campaign_rootdir must point to the location of all campaign files
 # ACX and UEDGE_campaign_rootdir must be absolute paths.
+
 ACX: /home/adios/dropbox/adios-campaign-store/kstar.acx
 UEDGE_campaign_rootdir: /home/adios/dropbox/adios-campaign-store/KSTAR24
+
+# Random seed, that makes the series of runs of the trainer script reproducible 
+# from the very beginning if you remove the training set
+
 RANDOM_STATE: 42
