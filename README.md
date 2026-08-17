@@ -16,8 +16,8 @@ kstar_uedge_trainer
 The original case lists used for the DivControlNN publication can be downloaded in their published order with:
 
 ```bash
-kstar_uedge_download_orginal_set --dataset testing
-kstar_uedge_download_orginal_set --dataset training
+kstar_uedge_download_original_set --dataset testing
+kstar_uedge_download_original_set --dataset training
 ```
 
 The testing and training case lists are `original/cases_for_testing.txt` and `original/cases_for_training.txt`.
