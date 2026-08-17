@@ -1,3 +1,5 @@
+"""Download a randomly sampled testing set from the indexed campaigns."""
+
 import sys
 from pathlib import Path
 from shutil import rmtree
@@ -14,7 +16,7 @@ TESTING_DIR = Path("testing_set")
 
 
 def main() -> None:
-    """Create a testing set from randomly selected campaign runs."""
+    """Download a testing set from randomly selected campaign runs."""
     if not ACX.exists():
         print(f"ERROR: Campaign index file {ACX} does not exist")
         sys.exit(1)

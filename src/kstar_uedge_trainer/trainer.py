@@ -65,11 +65,11 @@ if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp
 if testing_set_dir is None:
     testing_set_dir = select_testing_dir(TESTING_DIR)
     if testing_set_dir is None:
-        print("Run kstar_uedge_create_testing_set to create a testing set first")
+        print("Run kstar_uedge_download_testing_set to download a testing set first")
         sys.exit(1)
 
     if not (testing_set_dir / "df.pkl").exists() or not (testing_set_dir / "testing_set.bp").exists():
-        print(f"The testing set in {testing_set_dir} is missing/incomplete. Rerun kstar_uedge_create_testing_set")
+        print(f"The testing set in {testing_set_dir} is missing/incomplete. Rerun kstar_uedge_download_testing_set")
         sys.exit(1)
 
 df_testing = pd.read_pickle(testing_set_dir / "df.pkl")

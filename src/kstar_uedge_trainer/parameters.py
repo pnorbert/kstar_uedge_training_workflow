@@ -4,6 +4,9 @@ from pathlib import Path
 
 import pandas as pd
 
+_NUMBER = r"([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)"
+_CASE_PATTERN = re.compile(rf"Ip([0-9]+)/ML2d_n{_NUMBER}_p{_NUMBER}_f{_NUMBER}_d{_NUMBER}")
+
 # ACX = "/home/adios/dropbox/adios-campaign-store/kstar.acx"
 
 # Define five control parameters (i.e., inputs)
@@ -30,10 +33,8 @@ import pandas as pd
 def GetParameters(
     ACX: str,
 ) -> tuple[list[int], list[float], list[float], list[float], list[float]]:
-    # num = r"([0-9]+(?:\.[0-9]+)?)"
-    num = r"([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)"
-    pattern1 = rf"Ip([0-9]+)_p{num}_d{num}(?:\.|$)"
-    pattern2 = rf"n{num}/f{num}(?:/|$)"
+    pattern1 = rf"Ip([0-9]+)_p{_NUMBER}_d{_NUMBER}(?:\.|$)"
+    pattern2 = rf"n{_NUMBER}/f{_NUMBER}(?:/|$)"
     Ip_list, p_list, d_list, n_list, f_list = [], [], [], [], []
     con = sqlite3.connect(ACX)
     con.row_factory = sqlite3.Row
@@ -67,6 +68,33 @@ def GetParameters(
     cur.close()
     con.close()
     print(f"rows = {nrows}, valid = {mrows}")
+    return Ip_list, p_list, d_list, n_list, f_list
+
+
+def GetParametersFromCaseList(
+    case_list: str | Path,
+) -> tuple[list[int], list[float], list[float], list[float], list[float]]:
+    """Read control parameters from a list of ``Ip*/ML2d_*`` case names."""
+    path = Path(case_list)
+    Ip_list, p_list, d_list, n_list, f_list = [], [], [], [], []
+
+    with path.open(encoding="utf-8") as stream:
+        for line_number, line in enumerate(stream, start=1):
+            case = line.strip()
+            if not case:
+                continue
+
+            match = _CASE_PATTERN.fullmatch(case)
+            if match is None:
+                raise ValueError(f"Invalid case name at {path}:{line_number}: {case!r}")
+
+            Ip, n, p, f, d = match.groups()
+            Ip_list.append(int(Ip))
+            p_list.append(float(p))
+            d_list.append(float(d))
+            n_list.append(float(n))
+            f_list.append(float(f))
+
     return Ip_list, p_list, d_list, n_list, f_list
 
 
