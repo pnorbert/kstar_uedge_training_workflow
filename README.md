@@ -11,14 +11,17 @@ kstar_uedge_download_testing_set
 kstar_uedge_trainer
 ```
 
-## Original final testing set by Ben Zhu et al. 
-The original testing set that was used for the DivControlNN publication*, is already included in `original/testing_set/16293_1` but can be re-downloaded with a separate script, which downloads these cases from `original/cases_for_validation.txt`, 
+## Original training and testing sets by Ben Zhu et al.
+
+The original case lists used for the DivControlNN publication can be downloaded in their published order with:
 
 ```bash
-kstar_uedge_download_original_testing_set
+kstar_uedge_download_orginal_set --dataset testing
+kstar_uedge_download_orginal_set --dataset training
 ```
 
-This writes the dataframe and ADIOS2 dataset to `original/testing_set/16293_1`.
+The testing and training case lists are `original/cases_for_testing.txt` and `original/cases_for_training.txt`.
+Outputs are written to `testing_set/<n>_1` or `training_set/1`; by default, `n` is the full list length.
 
 ## DivControlNN publication
 ```

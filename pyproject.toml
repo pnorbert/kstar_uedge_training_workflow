@@ -62,7 +62,7 @@ Tracker = "https://github.com/pnorbert/kstar_uedge_training_workflow.git/issues"
 [project.scripts]
 kstar_uedge_trainer = "kstar_uedge_trainer.__main__:main"
 kstar_uedge_download_testing_set = "kstar_uedge_trainer.download_testing_set:main"
-kstar_uedge_download_original_testing_set = "kstar_uedge_trainer.download_original_testing_set:main"
+kstar_uedge_download_orginal_set = "kstar_uedge_trainer.download_orginal_set:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
