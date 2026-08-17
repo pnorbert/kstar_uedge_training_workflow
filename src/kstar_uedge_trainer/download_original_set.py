@@ -1,4 +1,4 @@
-"""Download an original testing or training set in its published case order."""
+"""Download an original final evaluation or training set in its published case order."""
 
 import argparse
 import json
@@ -23,11 +23,11 @@ from .utils import input_yes_or_no, read_config
 CONFIG = read_config()
 UEDGE_CAMPAIGN_ROOTDIR = CONFIG.uedge_campaign_rootdir
 CASE_LIST_FILENAMES = {
-    "testing": "cases_for_testing.txt",
+    "final_evaluation": "cases_for_final_evaluation.txt",
     "training": "cases_for_training.txt",
 }
 OUTPUT_ROOTS = {
-    "testing": Path("testing_set"),
+    "final_evaluation": Path("final_evaluation_set"),
     "training": Path("training_set"),
 }
 ELEMENTARY_CHARGE = 1.60217663e-19
@@ -85,13 +85,13 @@ def _remove_output(path: Path) -> None:
 
 
 def _output_directory(dataset: str, number: int) -> Path:
-    name = f"{number}_1" if dataset == "testing" else "1"
+    name = f"{number}_1" if dataset == "final_evaluation" else "1"
     return OUTPUT_ROOTS[dataset] / name
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = _ArgumentParser(
-        description="Download an original testing or training set in case-list order.",
+        description="Download an original final evaluation or training set in case-list order.",
     )
     parser.add_argument(
         "--dataset",
@@ -103,11 +103,13 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "-n",
         "--number",
         type=int,
-        help="number of cases to download from the start of the list (default: the entire list)",
+        help="number of cases from the start of the list; final evaluation may be 0 (default: the entire list)",
     )
     args = parser.parse_args(argv)
-    if args.number is not None and args.number < 1:
-        parser.error("--number must be a positive integer")
+    if args.number is not None and args.number < 0:
+        parser.error("--number must be a non-negative integer")
+    if args.dataset == "training" and args.number == 0:
+        parser.error("--number must be positive for the training set")
     return args
 
 
@@ -294,6 +296,10 @@ def main(argv: list[str] | None = None) -> None:
     print(f"    case list: {case_list}")
     print(f"    number:    {number}")
     print(f"    output:    {savedir}")
+
+    if number == 0:
+        print("No final evaluation set requested.")
+        return
 
     if dataframe_path.exists() or dataset_path.exists():
         print(f"The {args.dataset} set in {savedir} already exists or is incomplete.")

@@ -11,7 +11,7 @@ from .parameters import (
     GetDataFrame,
     GetParameters,
     ask_an_integer,
-    select_testing_dir,
+    select_final_evaluation_dir,
 )
 from .utils import input_int, input_yes_or_no, read_config
 
@@ -23,7 +23,7 @@ CONFIG = read_config()
 ACX = CONFIG.acx
 UEDGE_campaign_rootdir = CONFIG.uedge_campaign_rootdir
 RANDOM_STATE = CONFIG.random_state
-TESTING_DIR = Path("testing_set")
+FINAL_EVALUATION_DIR = Path("final_evaluation_set")
 TRAININGSET_DIR = Path(f"training_set/{RANDOM_STATE}")
 MODEL_DIR = Path("model")
 
@@ -36,7 +36,7 @@ if not UEDGE_campaign_rootdir.exists():
     sys.exit(1)
 
 # 1. Check existing training data that is already downloaded
-# 2. Select testing set first, load testing parameters (dataframe)
+# 2. Select final_evaluation set first, load final_evaluation parameters (dataframe)
 # 3. Get all the available runs (from ACX) -> DataFrame  (parameters.py )
 # in a loop until model is good enough
 #   4. Get N random samples from the Training set
@@ -49,30 +49,36 @@ if not UEDGE_campaign_rootdir.exists():
 #
 # 1. Check on existing training data
 #
-testing_set_dir = None
+final_evaluation_set_dir = None
 df_existing_training = pd.DataFrame()
 if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp").exists():
     print(f"Some training set exists in {TRAININGSET_DIR}")
     df_existing_training: pd.DataFrame = pd.read_pickle(TRAININGSET_DIR / "df.pkl")
     print(f"    found {len(df_existing_training)} samples")
-    tsd = TRAININGSET_DIR / "testing_set"
-    if tsd.exists() and (tsd.is_symlink() or tsd.is_dir()):
-        testing_set_dir = tsd
+    fesd = TRAININGSET_DIR / "final_evaluation_set"
+    if fesd.exists() and (fesd.is_symlink() or fesd.is_dir()):
+        final_evaluation_set_dir = fesd
 
 #
-# 2. Select testing set first, load testing parameters (dataframe)
+# 2. Select final_evaluation set first, load final_evaluation parameters (dataframe)
 #
-if testing_set_dir is None:
-    testing_set_dir = select_testing_dir(TESTING_DIR)
-    if testing_set_dir is None:
-        print("Run kstar_uedge_download_testing_set to download a testing set first")
+if final_evaluation_set_dir is None:
+    final_evaluation_set_dir = select_final_evaluation_dir(FINAL_EVALUATION_DIR)
+    if final_evaluation_set_dir is None:
+        print("Run kstar_uedge_download_final_evaluation_set to download a final evaluation set first")
         sys.exit(1)
 
-    if not (testing_set_dir / "df.pkl").exists() or not (testing_set_dir / "testing_set.bp").exists():
-        print(f"The testing set in {testing_set_dir} is missing/incomplete. Rerun kstar_uedge_download_testing_set")
+    if (
+        not (final_evaluation_set_dir / "df.pkl").exists()
+        or not (final_evaluation_set_dir / "final_evaluation_set.bp").exists()
+    ):
+        print(
+            f"The final evaluation set in {final_evaluation_set_dir} is missing/incomplete. "
+            "Rerun kstar_uedge_download_final_evaluation_set"
+        )
         sys.exit(1)
 
-df_testing = pd.read_pickle(testing_set_dir / "df.pkl")
+df_final_evaluation = pd.read_pickle(final_evaluation_set_dir / "df.pkl")
 
 
 #
@@ -80,7 +86,7 @@ df_testing = pd.read_pickle(testing_set_dir / "df.pkl")
 #
 Ip_list, p_list, d_list, n_list, f_list = GetParameters(str(ACX))
 df = GetDataFrame(Ip_list, p_list, d_list, n_list, f_list)
-df_all_training = df.drop(df_testing.index)
+df_all_training = df.drop(df_final_evaluation.index)
 if not df_existing_training.empty:
     df_all_training = df_all_training.drop(df_existing_training.index)
 
@@ -136,7 +142,7 @@ else:
     print(f"Save data to training set {TRAININGSET_DIR}")
     TRAININGSET_DIR.mkdir(parents=True, exist_ok=True)
     sampled_df.to_pickle(TRAININGSET_DIR / "df.pkl")
-    (TRAININGSET_DIR / "testing_set").symlink_to(testing_set_dir.resolve(), target_is_directory=True)
+    (TRAININGSET_DIR / "final_evaluation_set").symlink_to(final_evaluation_set_dir.resolve(), target_is_directory=True)
 
 
 # we could keep data in memory and update the model but instead
@@ -159,5 +165,4 @@ autoencoder_path = train_autoencoder(TRAININGSET_DIR, model_id)
 train_mlp(TRAININGSET_DIR, autoencoder_path, model_id)
 
 
-#   8. Evaluate model with testing set
 #   9. Select new N random samples

@@ -1,4 +1,4 @@
-"""Download a randomly sampled testing set from the indexed campaigns."""
+"""Download a randomly sampled final evaluation set from the campaign index."""
 
 import sys
 from pathlib import Path
@@ -12,11 +12,11 @@ CONFIG = read_config()
 ACX = CONFIG.acx
 UEDGE_campaign_rootdir = CONFIG.uedge_campaign_rootdir
 RANDOM_STATE = CONFIG.random_state
-TESTING_DIR = Path("testing_set")
+FINAL_EVALUATION_DIR = Path("final_evaluation_set")
 
 
 def main() -> None:
-    """Download a testing set from randomly selected campaign runs."""
+    """Download a final evaluation set from randomly selected campaign runs."""
     if not ACX.exists():
         print(f"ERROR: Campaign index file {ACX} does not exist")
         sys.exit(1)
@@ -26,7 +26,7 @@ def main() -> None:
         sys.exit(1)
 
     # 1. Get all the available runs (from ACX) -> DataFrame  (parameters.py )
-    # 2. Get M random samples from the DataFrame for Validation set. Save to disk (pickle)
+    # 2. Get M random samples from the DataFrame for the final evaluation set. Save to disk (pickle)
     # 3. Get the archives (aca) and runs that need to be read
     # 4. Read the runs and process the data -> data for evaluation. Save to disk (adios)
 
@@ -38,7 +38,7 @@ def main() -> None:
 
     print(
         """
-   Cases = Number of cases to train on.
+   Cases = Number of available campaign cases.
    ip    = plasma current [in kA],
    n     = ncore: core electron (roughly psin=0.95) density [in m^-3]
    p     = pinj:  total injection power [in MW]
@@ -52,14 +52,17 @@ def main() -> None:
     #
     # 2. Get M random samples from the DataFrame
     #
-    m_samples = input_int("Number of testing samples", 10, int(len(df) / 3), 1000)
+    m_samples = input_int("Number of final evaluation samples", 0, int(len(df) / 3), 1000)
+    if m_samples == 0:
+        print("No final evaluation set requested.")
+        return
 
-    savedir = TESTING_DIR / f"{m_samples}_{RANDOM_STATE}"
-    if (savedir / "df.pkl").exists() and (savedir / "testing_set.bp").exists():
-        print(f"This testing set ({m_samples} samples with random state {RANDOM_STATE}) already exist")
+    savedir = FINAL_EVALUATION_DIR / f"{m_samples}_{RANDOM_STATE}"
+    if (savedir / "df.pkl").exists() and (savedir / "final_evaluation_set.bp").exists():
+        print(f"This final evaluation set ({m_samples} samples with random state {RANDOM_STATE}) already exists")
         if not input_yes_or_no("Do you want to recreate this sample (y/n)? "):
             sys.exit(0)
-        rmtree(savedir / "testing_set.bp")
+        rmtree(savedir / "final_evaluation_set.bp")
         (savedir / "df.pkl").unlink()
     else:
         savedir.mkdir(parents=True, exist_ok=True)
@@ -84,11 +87,11 @@ def main() -> None:
         print(f"      {cases_count} cases downloaded.")
     print(f"In total, {cases_count} cases are attained.")
 
-    *_, rads = combine_data(output=savedir / "testing_set.bp", append=False)
+    *_, rads = combine_data(output=savedir / "final_evaluation_set.bp", append=False)
 
     print(f"Shape of rads = {rads.shape}")
     # print(rads)
-    print(f"Validation set is saved in {savedir}  with {m_samples} samples using random state {RANDOM_STATE}")
+    print(f"Final evaluation set is saved in {savedir} with {m_samples} samples using random state {RANDOM_STATE}")
 
 
 if __name__ == "__main__":

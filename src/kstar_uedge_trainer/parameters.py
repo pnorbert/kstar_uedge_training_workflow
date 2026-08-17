@@ -103,7 +103,7 @@ def GetDataFrame(Ips: list[int], ps: list[float], ds: list[float], ns: list[floa
     return df
 
 
-def select_testing_dir(base: Path):
+def select_final_evaluation_dir(base: Path):
     if not base.exists() or not base.is_dir():
         print(f"Directory '{base}' does not exist.")
         return None
@@ -121,14 +121,14 @@ def select_testing_dir(base: Path):
                 continue
 
     if not options:
-        print("No valid testing directories found.")
+        print("No valid final_evaluation directories found.")
         return None
 
     # Sort for nicer display
     options.sort()
 
     # Show choices
-    print("Available testing sets:")
+    print("Available final_evaluation sets:")
     for i, (M, r, _) in enumerate(options):
         print(f"{i}: M={M}, r={r}")
 
