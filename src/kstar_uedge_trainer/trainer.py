@@ -111,47 +111,54 @@ print(f"Cases = {len(df_all_training)}")
 
 # 4. Get N random samples from the DataFrame
 #
-n_samples = ask_an_integer("How many samples to read (0:exit)? ")
-if n_samples < 1:
+n_samples = ask_an_integer("How many new samples to read (-1:exit 0:train on existing samples)? ")
+if n_samples < 0:
     sys.exit(1)
-sampled_df = df_all_training.sample(n_samples, random_state=RANDOM_STATE)
 
-#
-# 5. Get the archives (aca) and runs that need to be read
-#
-grouped = sampled_df.groupby(["Ip", "p", "d"])[["n", "f"]].apply(lambda g: list(map(tuple, g.to_numpy())))
+if n_samples == 0 and df_existing_training.empty:
+    print(f"No existing samples and no new samples. Quit.")
+    sys.exit(1)
 
-#
-# 6. Read the runs and process the data -> data for training
-#
-cases_count = 0
-for (Ip, p, d), nf_pairs in grouped.items():
-    ACA = UEDGE_campaign_rootdir / f"Ip{Ip}_p{p}_d{d}.aca"
-    print(f"    Ip{Ip}_p{p}_d{d}.aca:")
-    cases_count += read_one_campaign(ACA, Ip, p, d, nf_pairs)
-    print(f"      {cases_count} cases downloaded.")
-print(f"In total, {cases_count} cases were downloaded.")
+if n_samples > 0:
+    sampled_df = df_all_training.sample(n_samples, random_state=RANDOM_STATE)
 
+    #
+    # 5. Get the archives (aca) and runs that need to be read
+    #
+    grouped = sampled_df.groupby(["Ip", "p", "d"])[["n", "f"]].apply(lambda g: list(map(tuple, g.to_numpy())))
 
-if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp").exists():
-    print(f"Append new data to training set {TRAININGSET_DIR}")
-    df_existing_training: pd.DataFrame = pd.read_pickle(TRAININGSET_DIR / "df.pkl")
-    merged_df = pd.concat([df_existing_training, sampled_df], ignore_index=False).drop_duplicates()
-    merged_df.to_pickle(TRAININGSET_DIR / "df.pkl")
+    #
+    # 6. Read the runs and process the data -> data for training
+    #
+    cases_count = 0
+    for (Ip, p, d), nf_pairs in grouped.items():
+        ACA = UEDGE_campaign_rootdir / f"Ip{Ip}_p{p}_d{d}.aca"
+        print(f"    Ip{Ip}_p{p}_d{d}.aca:")
+        cases_count += read_one_campaign(ACA, Ip, p, d, nf_pairs)
+        print(f"      {cases_count} cases downloaded.")
+    print(f"In total, {cases_count} cases were downloaded.")
+
+    # we could keep data in memory and update the model but instead
+    # here we save the new data as another step in the training set on disk
+    # and reload the whole thing for trainign from file
+    # ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = combine_data(output=savedir)
+    # print(f"Shape of rads = {rads.shape}")
+    # print(rads)
+    combine_data(output=TRAININGSET_DIR / "training_set.bp", append=True)
+
+# Save all samples into pickle
+if not df_existing_training.empty:
+    if n_samples > 0:
+        print(f"Append new data to training set {TRAININGSET_DIR}")
+        merged_df = pd.concat([df_existing_training, sampled_df], ignore_index=False).drop_duplicates()
+        merged_df.to_pickle(TRAININGSET_DIR / "df.pkl")
+    else:
+        merged_df = df_existing_training
 else:
     print(f"Save data to training set {TRAININGSET_DIR}")
     TRAININGSET_DIR.mkdir(parents=True, exist_ok=True)
     sampled_df.to_pickle(TRAININGSET_DIR / "df.pkl")
     (TRAININGSET_DIR / "final_evaluation_set").symlink_to(final_evaluation_set_dir.resolve(), target_is_directory=True)
-
-
-# we could keep data in memory and update the model but instead
-# here we save the new data as another step in the training set on disk
-# and reload the whole thing for trainign from file
-# ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = combine_data(output=savedir)
-# print(f"Shape of rads = {rads.shape}")
-# print(rads)
-combine_data(output=TRAININGSET_DIR / "training_set.bp", append=True)
 
 #
 #   7. Train model

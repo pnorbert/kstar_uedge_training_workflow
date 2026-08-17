@@ -155,8 +155,7 @@ def ask_an_integer(quote: str) -> int:
             choice = input(quote).strip()
             try:
                 n = int(choice)
-                if n >= 0:
-                    return n
+                return n
             except ValueError:
                 pass
             print("Enter a non-negative integer please.")
