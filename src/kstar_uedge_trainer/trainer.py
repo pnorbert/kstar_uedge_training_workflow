@@ -15,6 +15,18 @@ from .parameters import (
 )
 from .utils import input_int, input_yes_or_no, read_config
 
+
+
+def exclude_cases(source: pd.DataFrame, excluded: pd.DataFrame) -> pd.DataFrame:
+    CASE_COLUMNS = ["Ip", "p", "d", "n", "f"]
+    if excluded.empty:
+        return source
+
+    source_keys = pd.MultiIndex.from_frame(source[CASE_COLUMNS])
+    excluded_keys = pd.MultiIndex.from_frame(excluded[CASE_COLUMNS])
+    return source.loc[~source_keys.isin(excluded_keys)]
+
+
 #
 # MAIN program
 #
@@ -86,10 +98,9 @@ df_final_evaluation = pd.read_pickle(final_evaluation_set_dir / "df.pkl")
 #
 Ip_list, p_list, d_list, n_list, f_list = GetParameters(str(ACX))
 df = GetDataFrame(Ip_list, p_list, d_list, n_list, f_list)
-df_all_training = df.drop(df_final_evaluation.index)
-if not df_existing_training.empty:
-    df_all_training = df_all_training.drop(df_existing_training.index)
-
+df_all_training = exclude_cases(df, df_final_evaluation)
+df_all_training = exclude_cases(df_all_training, df_existing_training)
+    
 print(
     """
    Cases = Number of cases to train on.
