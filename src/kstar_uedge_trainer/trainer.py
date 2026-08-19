@@ -10,7 +10,6 @@ from .loader import combine_data, load_data, read_one_campaign
 from .parameters import (
     GetDataFrame,
     GetParameters,
-    ask_an_integer,
     select_final_evaluation_dir,
 )
 from .utils import input_int, input_yes_or_no, read_config
@@ -122,7 +121,7 @@ print(f"Cases = {len(df_all_training)}")
 
 # 4. Get N random samples from the DataFrame
 #
-n_samples = ask_an_integer("How many new samples to read (-1:exit 0:train on existing samples)? ")
+n_samples = input_int("How many new samples to read (-1:exit 0:train on existing samples)? ", -1, len(df_all_training), 1000)
 if n_samples < 0:
     sys.exit(1)
 

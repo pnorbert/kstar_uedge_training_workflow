@@ -52,8 +52,8 @@ def main() -> None:
     #
     # 2. Get M random samples from the DataFrame
     #
-    m_samples = input_int("Number of final evaluation samples", 0, int(len(df) / 3), 1000)
-    if m_samples == 0:
+    m_samples = input_int("Number of final evaluation samples (-1: exit)", -1, int(len(df) / 3), 1000)
+    if m_samples < 0:
         print("No final evaluation set requested.")
         return
 
@@ -79,13 +79,14 @@ def main() -> None:
     #
     # 4. Read the runs and process the data -> data for training
     #
-    cases_count = 0
-    for (Ip, p, d), nf_pairs in grouped.items():
-        ACA = UEDGE_campaign_rootdir / f"Ip{Ip}_p{p}_d{d}.aca"
-        print(f"    Ip{Ip}_p{p}_d{d}.aca:")
-        cases_count += read_one_campaign(ACA, Ip, p, d, nf_pairs)
-        print(f"      {cases_count} cases downloaded.")
-    print(f"In total, {cases_count} cases are attained.")
+    if m_samples > 0:
+        cases_count = 0
+        for (Ip, p, d), nf_pairs in grouped.items():
+            ACA = UEDGE_campaign_rootdir / f"Ip{Ip}_p{p}_d{d}.aca"
+            print(f"    Ip{Ip}_p{p}_d{d}.aca:")
+            cases_count += read_one_campaign(ACA, Ip, p, d, nf_pairs)
+            print(f"      {cases_count} cases downloaded.")
+        print(f"In total, {cases_count} cases are attained.")
 
     *_, rads = combine_data(output=savedir / "final_evaluation_set.bp", append=False)
 

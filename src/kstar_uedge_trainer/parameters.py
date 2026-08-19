@@ -146,19 +146,3 @@ def select_final_evaluation_dir(base: Path):
         except (KeyboardInterrupt, EOFError):
             print("\nInput aborted.")
             return None
-
-
-def ask_an_integer(quote: str) -> int:
-    # Ask user
-    while True:
-        try:
-            choice = input(quote).strip()
-            try:
-                n = int(choice)
-                return n
-            except ValueError:
-                pass
-            print("Enter a non-negative integer please.")
-        except (KeyboardInterrupt, EOFError):
-            print("\nInput aborted.")
-            return -1
