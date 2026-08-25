@@ -31,6 +31,7 @@ def exclude_cases(source: pd.DataFrame, excluded: pd.DataFrame) -> pd.DataFrame:
 # MAIN program
 #
 
+print("Start trainer program. Load config...")
 CONFIG = read_config()
 ACX = CONFIG.acx
 UEDGE_campaign_rootdir = CONFIG.uedge_campaign_rootdir
@@ -61,10 +62,11 @@ if not UEDGE_campaign_rootdir.exists():
 #
 # 1. Check on existing training data
 #
+print("Check existing training data...")
 final_evaluation_set_dir = None
 df_existing_training = pd.DataFrame()
 if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp").exists():
-    print(f"Some training set exists in {TRAININGSET_DIR}")
+    print(f"  Some training set exists in {TRAININGSET_DIR}")
     df_existing_training: pd.DataFrame = pd.read_pickle(TRAININGSET_DIR / "df.pkl")
     print(f"    found {len(df_existing_training)} samples")
     fesd = TRAININGSET_DIR / "final_evaluation_set"
@@ -74,10 +76,11 @@ if (TRAININGSET_DIR / "df.pkl").exists() and (TRAININGSET_DIR / "training_set.bp
 #
 # 2. Select final_evaluation set first, load final_evaluation parameters (dataframe)
 #
+print("Check final evaluation set...")
 if final_evaluation_set_dir is None:
     final_evaluation_set_dir = select_final_evaluation_dir(FINAL_EVALUATION_DIR)
     if final_evaluation_set_dir is None:
-        print("Run kstar_uedge_download_final_evaluation_set to download a final evaluation set first")
+        print("  Run kstar_uedge_download_final_evaluation_set to download a final evaluation set first")
         sys.exit(1)
 
     if (
@@ -85,17 +88,19 @@ if final_evaluation_set_dir is None:
         or not (final_evaluation_set_dir / "final_evaluation_set.bp").exists()
     ):
         print(
-            f"The final evaluation set in {final_evaluation_set_dir} is missing/incomplete. "
+            f"  The final evaluation set in {final_evaluation_set_dir} is missing/incomplete. "
             "Rerun kstar_uedge_download_final_evaluation_set"
         )
         sys.exit(1)
 
 df_final_evaluation = pd.read_pickle(final_evaluation_set_dir / "df.pkl")
+print(f" Final evaluation set from {final_evaluation_set_dir} has {len(df_final_evaluation)} samples")
 
 
 #
 # 3. Get all the available runs (from ACX) -> DataFrame
 #
+print("Process ACX index...")
 Ip_list, p_list, d_list, n_list, f_list = GetParameters(str(ACX))
 df = GetDataFrame(Ip_list, p_list, d_list, n_list, f_list)
 df_all_training = exclude_cases(df, df_final_evaluation)
