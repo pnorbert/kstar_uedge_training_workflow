@@ -18,7 +18,14 @@ def _read_all_steps(filename: str, variable_names: tuple[str, ...]) -> tuple[np.
     with Stream(filename, "r") as stream:
         for _ in stream.steps():
             for name in variable_names:
-                values_by_name[name].append(np.array(stream.read(name), copy=True))
+                variable = stream.inquire_variable(name)
+                if variable is None:
+                    raise KeyError(f"Variable {name!r} not found in ADIOS2 file {filename}")
+                shape = tuple(variable.shape())
+                if 0 in shape:
+                    values_by_name[name].append(np.empty(shape))
+                else:
+                    values_by_name[name].append(np.array(stream.read(variable), copy=True))
 
     if not values_by_name[variable_names[0]]:
         raise ValueError(f"No steps found in ADIOS2 file {filename}")
@@ -37,7 +44,11 @@ def read_data_inputs(filename: str):
     Returns:
         tuple: Arrays for ip, ncore, pinj, fz, and diff.
     """
-    ip, ncore, pinj, fz, diff = _read_all_steps(filename, ("ip", "ncore", "pinj", "fz", "diff"))
+    values = _read_all_steps(filename, ("ip", "ncore", "pinj", "fz", "diff"))
+    if any(value.size == 0 for value in values):
+        return tuple(np.empty(0, dtype=np.float32) for _ in values)
+
+    ip, ncore, pinj, fz, diff = values
 
     return (
         ip.astype(np.float32),

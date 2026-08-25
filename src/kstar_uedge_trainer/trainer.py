@@ -5,6 +5,7 @@ import pandas as pd
 
 from DivControlNN.train_autoencoder import train_autoencoder
 from DivControlNN.train_mlp import train_mlp
+from DivControlNN.validate_combined_model import validate_combined_model
 
 from .loader import combine_data, load_data, read_one_campaign
 from .parameters import (
@@ -174,12 +175,10 @@ else:
 #   7. Train model
 #
 
-ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = load_data(TRAININGSET_DIR / "training_set.bp")
+#ip, ncore, pinj, fz, diff, neu, teu, ter, tel, jr, qtr, qtl, rads = load_data(TRAININGSET_DIR / "training_set.bp")
 
 n = len(df_existing_training) + n_samples
 model_id = f"{RANDOM_STATE}_{n}"
-autoencoder_path = train_autoencoder(TRAININGSET_DIR, model_id)
-train_mlp(TRAININGSET_DIR, autoencoder_path, model_id)
-
-
-#   9. Select new N random samples
+autoencoder_path = train_autoencoder(TRAININGSET_DIR, model_id, CONFIG.vae_epochs)
+mlp_path = train_mlp(TRAININGSET_DIR, autoencoder_path, model_id, CONFIG.mlp_epochs)
+validate_combined_model(final_evaluation_set_dir, autoencoder_path, mlp_path, model_id)

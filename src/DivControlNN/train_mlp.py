@@ -11,19 +11,18 @@ from pathlib import Path
 
 import numpy as np
 
-from DivControlNN.src.data import lsr_standardize, read_data_inputs
-from DivControlNN.src.diagnose import plot_mlp_training_history, plot_mlp_validation_statistics
-from DivControlNN.src.keras_compat import keras, tf
+from .src.data import lsr_standardize, read_data_inputs
+from .src.diagnose import plot_mlp_training_history, plot_mlp_validation_statistics
+from .src.keras_compat import keras, tf
 
 # Training parameters
-EPOCHS = 10
+#EPOCHS = 10: should come from workflow config
 neurons = 32
 layers = 4
 dropout_rate = 0.2
 train_split = 0.9
 batch_size = 256
 initial_learning_rate = 1e-2
-nsample = 72000
 standardize_z = False
 
 # Learning rate schedule
@@ -53,8 +52,14 @@ def build_mlp_model(input_dim: int, output_dim: int):
     return model
 
 
-def train_mlp(inpath: Path, autoencoder_path: Path, model_id: str) -> Path:
+def train_mlp(inpath: Path, autoencoder_path: Path, model_id: str, nepochs: int) -> Path:
     """Train an MLP from the downloaded inputs and an autoencoder's latent space."""
+
+    print()
+    print("****************************************")
+    print(f"***  Train an MLP over {nepochs:>5} epochs. ***")
+    print("****************************************")
+    print()
     print("TensorFlow version:", tf.__version__)
 
     model_name = f"mlp_dc_n{neurons}_l{layers}_{model_id}"
@@ -92,7 +97,7 @@ def train_mlp(inpath: Path, autoencoder_path: Path, model_id: str) -> Path:
         raise ValueError("Latent-space sample_ids reference rows outside the MLP input data.")
 
     inputs = inputs[sample_ids]
-    ndata = min(inputs.shape[0], latent_space.shape[0], nsample)
+    ndata = min(inputs.shape[0], latent_space.shape[0])
     if ndata < 2:
         raise ValueError(f"Need at least 2 aligned samples to train the MLP, found {ndata}.")
     inputs = inputs[:ndata]
@@ -128,7 +133,7 @@ def train_mlp(inpath: Path, autoencoder_path: Path, model_id: str) -> Path:
     history = model.fit(
         train_data,
         train_labels,
-        epochs=EPOCHS,
+        epochs=nepochs,
         validation_split=0.2,
         batch_size=batch_size,
         shuffle=True,

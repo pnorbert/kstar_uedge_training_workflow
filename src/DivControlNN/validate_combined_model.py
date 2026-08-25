@@ -8,12 +8,11 @@ from __future__ import absolute_import, division, print_function
 
 import os
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.callbacks import ModelCheckpoint
 
+from .src.keras_compat import keras, tf
 from .src.autoencoder import Autoencoder
 from .src.data import *
 from .src.diagnose import *
@@ -22,14 +21,9 @@ from .src.diagnose import *
 # Configuration Options
 ################################################################################
 
-# Input data paths
-data_path = "data/"  # Path to raw input data
-fname = "KSTAR_C_high_Ip_val.hdf5"  # File name of input data
 
 # Pre-trained NNs
-mmae_path = "./models/vae_multimodal_dc_l16_20250311-222854/"  # Path to pre-trained AE model
 standardize_z = False  # Whether to standardize latent space representations
-mlp_path = "./models/mlp_dc_n32_l4_20250311_223941/"  # Path to pre-trained MLP model
 
 # Multi-modal autoencoder configuration
 arch_name = "multimodal_dc"  # Autoencoder architecture name
@@ -58,7 +52,8 @@ def build_mlp_model():
     """
     model = keras.Sequential(
         [
-            keras.layers.Dense(8, activation=tf.nn.relu, input_shape=(5,), name="input_pars"),
+            keras.Input(shape=(5,)),
+            keras.layers.Dense(8, activation=tf.nn.relu, name="input_pars"),
             keras.layers.Dense(16, activation=tf.nn.relu),
             keras.layers.BatchNormalization(),
             keras.layers.Dense(neurons, activation=tf.nn.relu),
@@ -68,34 +63,48 @@ def build_mlp_model():
             keras.layers.Dense(latent_dim, activation=None, name="z_mlp_pred"),  # Output layer
         ]
     )
-
-    # Compile the model with Adam optimizer and mean squared error loss
-    optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
-    model.compile(loss="mse", optimizer=optimizer)
     return model
 
 
-################################################################################
-# Main Script
-################################################################################
+def validate_combined_model(samples_path: Path, autoencoder_path: Path, mlp_path: Path, model_id: str):
+    """Validate combined model"""
 
-if __name__ == "__main__":
+    print()
+    print("********************************")
+    print(f"***  Validate combined model ***")
+    print("********************************")
+    print()
+
+    # load validation data
+    ip, ncore, pinj, fz, diff = read_data_inputs(str(samples_path / "final_evaluation_set.bp"))
+
+    print(f"We have {ip.shape[0]} samples for evaluation")
+    if ip.shape[0] < 100:
+        print("Combined model cannot be validated because there are not enough samples in the final evaluation set")
+        return
+
+    if ip.shape[0] < 1000:
+        print(
+            "Caution: Increasing the evaluation sample size to over 1000 is strongly recommended to "
+            "lower sampling uncertainty."
+        )
+
     # Load pre-trained MLP model for latent space prediction
     mlp = build_mlp_model()
-    mlp_weight_path = os.path.join(mlp_path, "best_val.hdf5")  # Path to saved MLP model weight
-    # mlp_weight_path = './models/mlp_example2_n32_l4_20250311_182752/best_val.hdf5'  # Path to saved MLP model weights
+    mlp_weight_path = os.path.join(mlp_path, "best_val.weights.h5")  # Path to saved MLP model weight
+    # mlp_weight_path = './models/mlp_example2_n32_l4_20250311_182752/best_val.weights.hdf5'  # Path to saved MLP model weights
     # mlp.load_model(mlp_path, compile=False)
     mlp.load_weights(mlp_weight_path)
 
     # Load autoencoder model
     autoencoder = Autoencoder(arch_name, input_shp=input_shp, feature_sz=feature_sz, latent_dim=latent_dim, do_vae=vae)
-    weights_path = os.path.join(mmae_path, "weights.weights.h5")
+    autoencoder(tuple(tf.zeros((1, *shape), dtype=tf.float32) for shape in input_shp), training=False)
+    weights_path = os.path.join(autoencoder_path, "weights.weights.h5")
     if not os.path.exists(weights_path):
-        weights_path = os.path.join(mmae_path, "weights")
+        weights_path = os.path.join(autoencoder_path, "weights")
     autoencoder.load_weights(weights_path)
 
     # Preprocess validation data
-    ip, ncore, pinj, fz, diff = read_data_inputs(data_path, fname)
     ip /= 1000.0  # Normalize current
     ncore /= 8.0  # Normalize core density
     pinj /= 10.0  # Normalize injected power
@@ -111,7 +120,7 @@ if __name__ == "__main__":
 
     # De-standardize latent space representation if needed
     if standardize_z:
-        with np.load(os.path.join(mmae_path, "z.npz")) as data:
+        with np.load(os.path.join(samples_path, "z.npz")) as data:
             lsr_mean = data["z_mean"]
             lsr_std = data["z_std"]
         z = lsr_destandardize(z, lsr_mean, lsr_std)
@@ -162,7 +171,11 @@ if __name__ == "__main__":
     y_teu = np.squeeze(np.exp(y_teu))
     y_neu = np.squeeze(np.exp(y_neu) / 1.0e19)
 
-    qtl, qtr, jl, jr, tel, ter, teu, neu, rads = read_data_outputs(data_path, fname)
+    qtl, qtr, jl, jr, tel, ter, teu, neu, rads = read_data_outputs(str(samples_path / "final_evaluation_set.bp"))
+    # fix for old final evaluation sets with wrong neu shape ([n, 25] instead of [n, 24])
+    if neu.shape[1] == teu.shape[1] + 1:
+        neu = neu[:, :-1]
+    assert neu.shape == jl.shape
 
     # Save combined validation results
     # outpath = './models/combined_validation_results/'

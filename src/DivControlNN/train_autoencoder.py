@@ -14,16 +14,16 @@ from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
 
-from DivControlNN.src.autoencoder import Autoencoder
-from DivControlNN.src.data import *
-from DivControlNN.src.diagnose import *
-from DivControlNN.src.keras_compat import tf
+from .src.autoencoder import Autoencoder
+from .src.data import *
+from .src.diagnose import *
+from .src.keras_compat import tf
 
 # Suppress TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # Enable eager execution for TensorFlow
-tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(False)
 print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
 
 # ------------------------------------------------------------------------------
@@ -36,12 +36,11 @@ latent_dim = 16  # Latent space dimensionality
 
 # Model architecture and training parameters
 arch_name = "multimodal_dc"
-nepochs = 10
+# nepochs = 10: should come from workflow config
 train_split = 0.9
 valid_split = 0.2
 batch_size = 256
 initial_learning_rate = 2e-2
-nsample = 72000
 vae = True  # Use Variational Autoencoder (VAE)
 
 # Learning rate schedule
@@ -54,7 +53,14 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 # ------------------------------------------------------------------------------
 
 
-def train_autoencoder(inpath: Path, model_id: str) -> Path:
+def train_autoencoder(inpath: Path, model_id: str, nepochs:int) -> Path:
+    """Train an autoencoder from the downloaded inputs."""
+
+    print()
+    print("***********************************************************")
+    print(f"***  Train a Multi-modal autoencoder over {nepochs:>5} epochs. ***")
+    print("***********************************************************")
+    print()
 
     # Define model name based on whether VAE is used
     model_name = f"vae_{arch_name}_l{latent_dim}_{model_id}" if vae else f"ae_{arch_name}_l{latent_dim}_{model_id}"
@@ -99,7 +105,6 @@ def train_autoencoder(inpath: Path, model_id: str) -> Path:
     rads[:, 4] = 10.0 * rads[:, 4] + 0.2
 
     # Prepare data for the autoencoder
-    print("Multi-modal autoencoder is required for this example.")
     dscalars = rads
     dprofiles1 = np.stack((teu, neu), axis=-1)
     dprofiles2 = np.stack((qtl, qtr, jl, jr, tel, ter), axis=-1)
@@ -117,7 +122,7 @@ def train_autoencoder(inpath: Path, model_id: str) -> Path:
         dprofiles1 = dprofiles1[finite_mask]
         dprofiles2 = dprofiles2[finite_mask]
 
-    ndata = min(dscalars.shape[0], nsample)
+    ndata = dscalars.shape[0]
     if ndata < 3:
         raise ValueError(f"Need at least 3 finite samples to train the autoencoder, found {ndata}.")
 

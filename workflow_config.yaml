@@ -1,0 +1,19 @@
+# ACX is the path to the KSTAR campaign index created from all campaign files
+#     see "hpc_campaign index -h"
+# UEDGE_CAMPAIGN_ROOTDIR must point to the location of all campaign files
+# ACX and UEDGE_CAMPAIGN_ROOTDIR must be absolute paths.
+
+ACX: /home/adios/dropbox/adios-campaign-store/kstar.acx
+UEDGE_CAMPAIGN_ROOTDIR: /home/adios/dropbox/adios-campaign-store/KSTAR24
+
+# Random seed, that makes the series of runs of the trainer script reproducible 
+# from the very beginning if you remove the training set
+
+RANDOM_STATE: 42
+
+# VAE model training epochs. Original paper used 5000 epochs to train
+VAE_EPOCHS: 10
+
+# MLP model training epochs. Original paper used 3000 epochs to train
+MLP_EPOCHS: 10
+

@@ -11,9 +11,11 @@ class WorkflowConfig:
     acx: Path
     uedge_campaign_rootdir: Path
     random_state: int
+    vae_epochs: int
+    mlp_epochs: int
 
 
-def read_config(config_file: str | Path = "config.yaml") -> WorkflowConfig:
+def read_config(config_file: str | Path = "workflow_config.yaml") -> WorkflowConfig:
     """Read and validate workflow settings from a YAML configuration file."""
     config_path = Path(config_file).expanduser().resolve()
     if not config_path.is_file():
@@ -28,7 +30,7 @@ def read_config(config_file: str | Path = "config.yaml") -> WorkflowConfig:
     if not isinstance(values, dict):
         raise ValueError(f"Configuration file {config_path} must contain a YAML mapping")
 
-    required = {"ACX", "UEDGE_campaign_rootdir", "RANDOM_STATE"}
+    required = {"ACX", "UEDGE_CAMPAIGN_ROOTDIR", "RANDOM_STATE", "VAE_EPOCHS", "MLP_EPOCHS"}
     missing = required - values.keys()
     if missing:
         names = ", ".join(sorted(missing))
@@ -43,14 +45,22 @@ def read_config(config_file: str | Path = "config.yaml") -> WorkflowConfig:
             raise ValueError(f"Configuration setting {key} must be an absolute path")
         return path.resolve()
 
-    random_state = values["RANDOM_STATE"]
-    if isinstance(random_state, bool) or not isinstance(random_state, int):
-        raise ValueError("Configuration setting RANDOM_STATE must be an integer")
+    def resolve_int(key: str) -> int:
+        value = values[key]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"Configuration setting {key} must be an integer")
+        return value
+
+    random_state = resolve_int("RANDOM_STATE")
+    vae_epochs = resolve_int("VAE_EPOCHS")
+    mlp_epochs = resolve_int("MLP_EPOCHS")
 
     return WorkflowConfig(
         acx=resolve_path("ACX"),
-        uedge_campaign_rootdir=resolve_path("UEDGE_campaign_rootdir"),
+        uedge_campaign_rootdir=resolve_path("UEDGE_CAMPAIGN_ROOTDIR"),
         random_state=random_state,
+        vae_epochs=vae_epochs,
+        mlp_epochs=mlp_epochs,
     )
 
 
