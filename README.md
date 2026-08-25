@@ -102,6 +102,16 @@ kstar_uedge_download_final_evaluation_set
 kstar_uedge_trainer
 ```
 
+The trainer saves combined final-evaluation predictions in each completed MLP
+model directory. Report the single-model error statistics with:
+
+```bash
+kstar_uedge_surrogate_evaluation models/mlp_dc_n32_l4_42_805
+```
+
+This command reads `combined_validation.npz` and recognizes the workflow's
+`best_val.weights.h5` filename. It does not load TensorFlow or import
+DivControlNN. Add `--csv results.csv` to save the statistics as CSV.
 
 ## Original training and final evaluation sets by Ben Zhu et al.
 
@@ -140,4 +150,3 @@ Latent space mapping: Revolutionizing predictive models for divertor plasma deta
 Phys. Plasmas 1 June 2025; 32 (6): 062508.
 ```
 https://doi.org/10.1063/5.0267930
-
